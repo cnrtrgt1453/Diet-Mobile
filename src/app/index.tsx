@@ -17,6 +17,15 @@ export default function HomeScreen() {
   const [stats, setStats] = useState({ total: 0, glp1: 0, lipedema: 0, weightManagement: 0, hormonalBalance: 0 });
   const [todayDiet, setTodayDiet] = useState<any>(null);
   
+  // Randevu State'leri
+  const [pendingAppointments, setPendingAppointments] = useState<any[]>([]);
+  const [approvedAppointments, setApprovedAppointments] = useState<any[]>([]);
+  const [myAppointments, setMyAppointments] = useState<any[]>([]);
+  const [isAppModalVisible, setIsAppModalVisible] = useState(false);
+  const [appDate, setAppDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+  const [appTime, setAppTime] = useState('');
+  const [appNote, setAppNote] = useState('');
+
   // Danışan ekleme modalı state'leri
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [name, setName] = useState('');
@@ -37,22 +46,42 @@ export default function HomeScreen() {
     if (!userToken) return;
     try {
       if (isDietitian) {
-        const res = await axios.get(`${API_BASE_URL}/api/v1/clients/stats`, {
+        // İstatistikleri çek
+        const resStats = await axios.get(`${API_BASE_URL}/api/v1/clients/stats`, {
           headers: { Authorization: `Bearer ${userToken}` }
         });
-        setStats(res.data);
+        setStats(resStats.data);
+
+        // Bekleyen randevuları çek
+        const resPending = await axios.get(`${API_BASE_URL}/api/v1/appointments/dietitian?status=PENDING`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        setPendingAppointments(resPending.data);
+
+        // Onaylanmış randevuları çek
+        const resApproved = await axios.get(`${API_BASE_URL}/api/v1/appointments/dietitian?status=APPROVED`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        setApprovedAppointments(resApproved.data);
       } else {
-        const res = await axios.get(`${API_BASE_URL}/api/v1/diets/my/today`, {
+        // Bugünün diyetini çek
+        const resDiet = await axios.get(`${API_BASE_URL}/api/v1/diets/my/today`, {
           headers: { Authorization: `Bearer ${userToken}` }
         });
-        if (typeof res.data === 'object') {
-          setTodayDiet(res.data);
+        if (typeof resDiet.data === 'object') {
+          setTodayDiet(resDiet.data);
         } else {
           setTodayDiet(null);
         }
+
+        // Danışanın randevularını çek
+        const resApps = await axios.get(`${API_BASE_URL}/api/v1/appointments/my`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        setMyAppointments(resApps.data);
       }
     } catch (e: any) {
-      console.error("Data load error:", e.message);
+      console.error("Data load error in dashboard:", e.message);
     }
   }, [userToken, isDietitian]);
 
@@ -130,6 +159,44 @@ export default function HomeScreen() {
     }
   };
 
+  // Randevu Talebi Gönder
+  const handleRequestAppointment = async () => {
+    if (!appDate || !appTime) {
+      Alert.alert("Hata", "Lütfen randevu tarihi ve saatini doldurunuz.");
+      return;
+    }
+    try {
+      const payload = {
+        appointmentDate: appDate,
+        appointmentTime: appTime,
+        note: appNote
+      };
+      await axios.post(`${API_BASE_URL}/api/v1/appointments`, payload, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Randevu talebiniz diyetisyeninize iletildi.");
+      setIsAppModalVisible(false);
+      setAppTime('');
+      setAppNote('');
+      loadData();
+    } catch (e: any) {
+      Alert.alert("Hata", e.response?.data || "Randevu talebi oluşturulamadı.");
+    }
+  };
+
+  // Randevu Durumunu Güncelle (Onayla / Reddet)
+  const handleUpdateAppointment = async (id: number, status: 'APPROVED' | 'REJECTED') => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/appointments/${id}/status?status=${status}`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", status === 'APPROVED' ? "Randevu onaylandı." : "Randevu reddedildi.");
+      loadData();
+    } catch (e) {
+      Alert.alert("Hata", "İşlem gerçekleştirilemedi.");
+    }
+  };
+
   // BMI Hesaplama Yardımcısı
   const calculateBMI = (w: number, h: number) => {
     if (!w || !h) return null;
@@ -150,6 +217,14 @@ export default function HomeScreen() {
       case 'LIPEDEMA': return 'Lipödem Diyeti';
       case 'HORMONAL_BALANCE': return 'Hormonal Denge';
       default: return 'Kilo Yönetimi';
+    }
+  };
+
+  const translateAppStatus = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return { text: 'Onaylandı', color: '#2E7D32', bg: '#E2EFE5' };
+      case 'REJECTED': return { text: 'Reddedildi', color: '#C62828', bg: '#FFEBEE' };
+      default: return { text: 'Onay Bekliyor', color: '#EF6C00', bg: '#FFF3E0' };
     }
   };
 
@@ -211,7 +286,6 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Hızlı Aksiyon Butonu */}
             <TouchableOpacity 
               style={[styles.primaryActionBtn, { backgroundColor: theme.primary }]}
               onPress={() => setIsAddModalVisible(true)}
@@ -219,13 +293,58 @@ export default function HomeScreen() {
               <ThemedText style={styles.primaryActionBtnText}>➕ Yeni Danışan Kaydı Ekle</ThemedText>
             </TouchableOpacity>
 
-            {/* Bilgilendirme Kartı */}
-            <View style={[styles.infoCard, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText style={styles.infoCardTitle}>📍 Alsancak Klinik & Online Takip</ThemedText>
-              <ThemedText style={styles.infoCardDesc}>
-                İzmir Alsancak kliniğinizdeki seanslarınızı ve online danışanlarınızı takip etmek için "Explore (Rehber)" sekmesini kullanın. Buradan her danışanın kilo grafiğini inceleyebilir, haftalık seans ölçümü girebilir ve kişiye özel günlük diyet menülerini oluşturabilirsiniz.
-              </ThemedText>
-            </View>
+            {/* Bekleyen Randevu Talepleri */}
+            <ThemedText style={styles.sectionTitle}>📅 Bekleyen Randevu Talepleri ({pendingAppointments.length})</ThemedText>
+            {pendingAppointments.length > 0 ? (
+              pendingAppointments.map((app) => (
+                <View key={app.id} style={[styles.appRequestCard, { backgroundColor: theme.backgroundElement }]}>
+                  <View style={styles.appCardHeader}>
+                    <ThemedText style={styles.appClientName}>{app.client.name}</ThemedText>
+                    <View style={[styles.miniBadge, { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText style={styles.miniBadgeText}>{translateCategory(app.client.category)}</ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText style={styles.appDateTime}>🗓 Tarih: <ThemedText style={styles.boldText}>{app.appointmentDate}</ThemedText> | Saat: <ThemedText style={styles.boldText}>{app.appointmentTime}</ThemedText></ThemedText>
+                  {app.note ? <ThemedText style={styles.appNote}>Not: "{app.note}"</ThemedText> : null}
+                  
+                  <View style={styles.appActionRow}>
+                    <TouchableOpacity 
+                      style={[styles.appBtn, styles.appRejectBtn]}
+                      onPress={() => handleUpdateAppointment(app.id, 'REJECTED')}
+                    >
+                      <ThemedText style={styles.appRejectText}>Reddet</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.appBtn, { backgroundColor: theme.primary }]}
+                      onPress={() => handleUpdateAppointment(app.id, 'APPROVED')}
+                    >
+                      <ThemedText style={styles.appApproveText}>Onayla</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={[styles.noItemsCard, { backgroundColor: theme.backgroundElement }]}>
+                <ThemedText style={styles.noItemsText}>🎉 Bekleyen randevu talebi bulunmuyor.</ThemedText>
+              </View>
+            )}
+
+            {/* Onaylanmış Randevular */}
+            <ThemedText style={styles.sectionTitle}>🗓 Yaklaşan Seanslar ({approvedAppointments.length})</ThemedText>
+            {approvedAppointments.length > 0 ? (
+              approvedAppointments.map((app) => (
+                <View key={app.id} style={[styles.appApprovedCard, { backgroundColor: theme.backgroundElement }]}>
+                  <View style={styles.appCardHeader}>
+                    <ThemedText style={styles.appClientName}>{app.client.name}</ThemedText>
+                    <ThemedText style={styles.appApprovedTime}>{app.appointmentDate} | {app.appointmentTime}</ThemedText>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={[styles.noItemsCard, { backgroundColor: theme.backgroundElement }]}>
+                <ThemedText style={styles.noItemsText}>Bu haftaya planlanmış seans bulunmuyor.</ThemedText>
+              </View>
+            )}
 
           </View>
         ) : (
@@ -274,14 +393,14 @@ export default function HomeScreen() {
 
               {userInfo?.category === 'GLP_1' && (
                 <View style={styles.categoryMetaRow}>
-                  <ThemedText style={styles.categoryMetaText}>💉 Enjeksiyon Günü: <ThemedText style={styles.boldText}>{userInfo?.glp1InjectionDay || "Belirtilmedi"}</ThemedText></ThemedText>
+                  <ThemedText style={styles.categoryMetaText}>💉 Enjeksiyon: <ThemedText style={styles.boldText}>{userInfo?.glp1InjectionDay || "Belirtilmedi"}</ThemedText></ThemedText>
                   <ThemedText style={styles.categoryMetaText}>Doz: <ThemedText style={styles.boldText}>{userInfo?.glp1Dosage || "0"}</ThemedText></ThemedText>
                 </View>
               )}
 
               {userInfo?.category === 'LIPEDEMA' && (
                 <View style={styles.categoryMetaRow}>
-                  <ThemedText style={styles.categoryMetaText}>🦵 Lipödem Evresi: <ThemedText style={styles.boldText}>Evre {userInfo?.lipedemaStage || "1"}</ThemedText></ThemedText>
+                  <ThemedText style={styles.categoryMetaText}>🦵 Lipödem: <ThemedText style={styles.boldText}>Evre {userInfo?.lipedemaStage || "1"}</ThemedText></ThemedText>
                   <ThemedText style={styles.categoryMetaText}>Ödem Karşıtı Beslenme: <ThemedText style={styles.boldText}>Aktif</ThemedText></ThemedText>
                 </View>
               )}
@@ -340,6 +459,38 @@ export default function HomeScreen() {
               </View>
             )}
 
+            {/* Randevu İsteme & Durumları */}
+            <View style={styles.rowBetween}>
+              <ThemedText style={styles.sectionTitle}>📅 Randevu Talepleriniz</ThemedText>
+              <TouchableOpacity 
+                style={[styles.smallAppBtn, { backgroundColor: theme.primary }]}
+                onPress={() => setIsAppModalVisible(true)}
+              >
+                <ThemedText style={styles.smallAppBtnText}>Talep Oluştur</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            {myAppointments.length > 0 ? (
+              myAppointments.map((app) => {
+                const statInfo = translateAppStatus(app.status);
+                return (
+                  <View key={app.id} style={[styles.appClientCard, { backgroundColor: theme.backgroundElement }]}>
+                    <View style={styles.appClientText}>
+                      <ThemedText style={styles.appClientDateTime}>{app.appointmentDate} | {app.appointmentTime}</ThemedText>
+                      {app.note ? <ThemedText style={styles.appClientNote}>Not: "{app.note}"</ThemedText> : null}
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statInfo.bg }]}>
+                      <ThemedText style={[styles.statusBadgeText, { color: statInfo.color }]}>{statInfo.text}</ThemedText>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={[styles.noItemsCard, { backgroundColor: theme.backgroundElement }]}>
+                <ThemedText style={styles.noItemsText}>Henüz yapılmış bir randevu talebiniz bulunmuyor.</ThemedText>
+              </View>
+            )}
+
             {/* Diyetisyen Künyesi */}
             <View style={[styles.dietitianCreditsCard, { backgroundColor: theme.backgroundElement }]}>
               <ThemedText style={styles.creditsEmoji}>👩‍⚕️</ThemedText>
@@ -354,6 +505,64 @@ export default function HomeScreen() {
         )}
 
       </SafeAreaView>
+
+      {/* ========================================================
+         DANIŞAN RANDEVU TALEP MODALI (CLIENT ONLY)
+         ======================================================== */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isAppModalVisible}
+        onRequestClose={() => setIsAppModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '60%' }]}>
+            
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">🗓 Randevu Talebi</ThemedText>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsAppModalVisible(false)}>
+                <ThemedText style={styles.modalCloseBtnText}>İptal</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalForm}>
+              <ThemedText style={styles.inputLabel}>Randevu Tarihi (YYYY-MM-DD)</ThemedText>
+              <TextInput 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                value={appDate}
+                onChangeText={setAppDate}
+              />
+
+              <ThemedText style={styles.inputLabel}>Randevu Saati (HH:MM)</ThemedText>
+              <TextInput 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                placeholder="Örn: 14:30"
+                placeholderTextColor={theme.textSecondary}
+                value={appTime}
+                onChangeText={setAppTime}
+              />
+
+              <ThemedText style={styles.inputLabel}>Diyetisyeninize Not</ThemedText>
+              <TextInput 
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                placeholder="Randevu sebebi veya sormak istediğiniz sorular..."
+                placeholderTextColor={theme.textSecondary}
+                multiline={true}
+                value={appNote}
+                onChangeText={setAppNote}
+              />
+
+              <TouchableOpacity 
+                style={[styles.saveBtn, { backgroundColor: theme.primary }]}
+                onPress={handleRequestAppointment}
+              >
+                <ThemedText style={styles.saveBtnText}>Talebi Gönder</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
 
       {/* ========================================================
          YENİ DANIŞAN EKLEME MODALI (DIETITIAN ONLY)
@@ -384,7 +593,7 @@ export default function HomeScreen() {
                 onChangeText={setName}
               />
 
-              <ThemedText style={styles.inputLabel}>E-posta Adresi (Sosyal giriş için kullanılacak)</ThemedText>
+              <ThemedText style={styles.inputLabel}>E-posta Adresi</ThemedText>
               <TextInput 
                 style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
                 placeholder="Örn: ayse.yilmaz@gmail.com"
@@ -592,6 +801,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: Spacing.two,
   },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -631,21 +845,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 16,
-  },
-  infoCard: {
-    padding: Spacing.four,
-    borderRadius: 16,
-    gap: Spacing.two,
-    marginTop: Spacing.one,
-  },
-  infoCardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  infoCardDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#546E5A',
   },
   
   // Danışan Paneli Styles
@@ -804,6 +1003,128 @@ const styles = StyleSheet.create({
   creditsLocation: {
     fontSize: 12,
     color: '#546E5A',
+  },
+
+  // Randevu Talepleri (Diyetisyen)
+  appRequestCard: {
+    padding: Spacing.three,
+    borderRadius: 16,
+    gap: Spacing.one,
+  },
+  appCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  appClientName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  appDateTime: {
+    fontSize: 13,
+    color: '#546E5A',
+  },
+  appNote: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#546E5A',
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  appActionRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  appBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appRejectBtn: {
+    backgroundColor: '#FFEBEE',
+  },
+  appRejectText: {
+    color: '#C62828',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  appApproveText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  miniBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  miniBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  noItemsCard: {
+    padding: Spacing.four,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  noItemsText: {
+    fontSize: 13,
+    color: '#546E5A',
+  },
+  appApprovedCard: {
+    padding: Spacing.three,
+    borderRadius: 14,
+  },
+  appApprovedTime: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+
+  // Randevu Talepleri (Danışan)
+  smallAppBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  smallAppBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  appClientCard: {
+    padding: Spacing.three,
+    borderRadius: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  appClientText: {
+    flex: 1,
+  },
+  appClientDateTime: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  appClientNote: {
+    fontSize: 12,
+    color: '#546E5A',
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
   },
 
   // Modal Styles
