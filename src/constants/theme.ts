@@ -9,18 +9,20 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#1C3A24', // Koyu orman yeşili (Okunabilirlik için)
+    background: '#F1F8F3', // Çok açık mint/yeşilimsi krem arka plan
+    backgroundElement: '#E1EFE4', // Açık sage yeşili kartlar
+    backgroundSelected: '#C8E6C9', // Seçili/Vurgulu yeşil tonu
+    textSecondary: '#546E5A', // Orta yeşil/gri ikincil metin
+    primary: '#2E7D32', // Ana yaprak yeşili rengi
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#E2EFE5',
+    background: '#0E1C11', // Koyu orman arka planı
+    backgroundElement: '#1A3321',
+    backgroundSelected: '#254B31',
+    textSecondary: '#81A588',
+    primary: '#4CAF50',
   },
 } as const;
 

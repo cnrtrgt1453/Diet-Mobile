@@ -86,7 +86,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 onPress={() => isMockMode ? triggerMockLogin('google') : googlePromptAsync()}
               >
                 <Text style={styles.googleIcon}>G</Text>
-                <Text style={styles.buttonText}>Google (Gmail) ile Giriş Yap</Text>
+                <Text style={styles.buttonText}>{isMockMode ? "Google (Diyetisyen Şüheda Terat)" : "Google ile Giriş Yap"}</Text>
               </TouchableOpacity>
 
               {/* Facebook Giriş Butonu */}
@@ -95,20 +95,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 onPress={() => isMockMode ? triggerMockLogin('facebook') : fbPromptAsync()}
               >
                 <Text style={styles.fbIcon}>f</Text>
-                <Text style={styles.buttonText}>Facebook ile Giriş Yap</Text>
+                <Text style={styles.buttonText}>{isMockMode ? "Facebook (Örnek Danışan)" : "Facebook ile Giriş Yap"}</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
 
         {/* Mock/Developer Modu Bilgilendirmesi */}
-        <View style={styles.mockModeContainer}>
-          <Text style={styles.mockTitle}>🔧 Geliştirici Modu (Mock Login)</Text>
-          <Text style={styles.mockDesc}>
-            Açık olduğunda, gerçek Google/Facebook hesabı kurmaya gerek olmadan doğrudan sahte (mock) jetonlarla backend üzerinden JWT üretip sistemi test edebilirsiniz.
+        <View style={[styles.mockModeContainer, { backgroundColor: '#E1EFE4', borderColor: '#C8E6C9' }]}>
+          <Text style={[styles.mockTitle, { color: '#1C3A24' }]}>🔧 Geliştirici Test Modu (Mock Login)</Text>
+          <Text style={[styles.mockDesc, { color: '#546E5A' }]}>
+            Açık olduğunda, gerçek Google/Facebook hesap API kurulumlarına gerek olmadan doğrudan test hesapları ile sisteme giriş yapabilirsiniz.
           </Text>
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Mock Test Modu:</Text>
+            <Text style={[styles.toggleLabel, { color: '#1C3A24' }]}>Geliştirici Modu:</Text>
             <TouchableOpacity 
               style={[styles.toggleBtn, isMockMode ? styles.toggleOn : styles.toggleOff]}
               onPress={() => setIsMockMode(!isMockMode)}
@@ -126,7 +126,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7F6',
+    backgroundColor: '#F1F8F3',
   },
   content: {
     flex: 1,
