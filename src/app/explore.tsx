@@ -23,6 +23,7 @@ export default function ExploreScreen() {
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [clientMeasurements, setClientMeasurements] = useState<any[]>([]);
   const [clientDiets, setClientDiets] = useState<any[]>([]);
+  const [clientDailyLogs, setClientDailyLogs] = useState<any[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
 
   // Ölçüm Ekleme Modalı State'leri
@@ -110,6 +111,12 @@ export default function ExploreScreen() {
         headers: { Authorization: `Bearer ${userToken}` }
       });
       setClientDiets(resDiets.data);
+
+      // Günlük klinik logları çek (Faz 1)
+      const resLogs = await axios.get(`${API_BASE_URL}/api/v1/logs/daily/client/${client.id}`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setClientDailyLogs(resLogs.data);
 
       setIsDetailModalVisible(true);
     } catch (e) {
@@ -385,6 +392,45 @@ export default function ExploreScreen() {
                     <ThemedText style={styles.actionBtnText}>🥗 Diyet Ata</ThemedText>
                   </TouchableOpacity>
                 </View>
+
+                {/* Klinik Günlük Rapor Paneli (Faz 1) */}
+                <ThemedText style={styles.modalSectionTitle}>📋 Klinik Günlük Takip Raporu (Son 14 Gün)</ThemedText>
+                {clientDailyLogs.length > 0 ? (
+                  clientDailyLogs.map((log) => (
+                    <View key={log.id} style={[styles.logReportCard, { backgroundColor: theme.backgroundElement }]}>
+                      <View style={styles.logReportHeader}>
+                        <ThemedText style={styles.logReportDate}>{log.logDate}</ThemedText>
+                        <ThemedText style={styles.logReportWater}>💧 {log.waterIntakeMl || 0} ml</ThemedText>
+                      </View>
+                      
+                      {selectedClient.category === 'GLP_1' && (
+                        <View style={styles.logReportMeta}>
+                          <ThemedText style={styles.logReportText}>💉 Yan Etki Düzeyi: <ThemedText style={styles.boldText}>{log.glp1SideEffectLevel || 0}/5</ThemedText></ThemedText>
+                          {log.glp1SideEffects ? <ThemedText style={styles.logReportNote}>Semptomlar: {log.glp1SideEffects}</ThemedText> : null}
+                        </View>
+                      )}
+
+                      {selectedClient.category === 'LIPEDEMA' && (
+                        <View style={styles.logReportMeta}>
+                          <ThemedText style={styles.logReportText}>🦵 Bacak Ağrısı: <ThemedText style={styles.boldText}>{log.lipedemaPainLevel || 0}/5</ThemedText></ThemedText>
+                          <View style={styles.logReportChips}>
+                            <View style={[styles.miniChip, log.glutenFreeCompliant ? styles.chipSuccess : styles.chipError]}><ThemedText style={styles.miniChipText}>Glütensiz</ThemedText></View>
+                            <View style={[styles.miniChip, log.sugarFreeCompliant ? styles.chipSuccess : styles.chipError]}><ThemedText style={styles.miniChipText}>Şekersiz</ThemedText></View>
+                            <View style={[styles.miniChip, log.dairyFreeCompliant ? styles.chipSuccess : styles.chipError]}><ThemedText style={styles.miniChipText}>Sütsüz</ThemedText></View>
+                          </View>
+                        </View>
+                      )}
+
+                      {selectedClient.category === 'HORMONAL_BALANCE' && (
+                        <View style={styles.logReportMeta}>
+                          <ThemedText style={styles.logReportText}>🧬 Döngü Fazı: <ThemedText style={styles.boldText}>{log.currentHormonalPhase || "Girilmedi"}</ThemedText></ThemedText>
+                        </View>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <ThemedText style={styles.emptyText}>Son 14 güne ait klinik günlük takip kaydı bulunmuyor.</ThemedText>
+                )}
 
                 {/* Ölçüm Geçmişi Tablosu */}
                 <ThemedText style={styles.modalSectionTitle}>Ölçüm Geçmişi</ThemedText>
@@ -829,6 +875,65 @@ const styles = StyleSheet.create({
   detailRowStatus: {
     fontSize: 11,
     color: '#2E7D32',
+  },
+
+  // Günlük log raporlama kartları (Diyetisyen Raporu)
+  logReportCard: {
+    padding: Spacing.three,
+    borderRadius: 12,
+    marginBottom: Spacing.one,
+    gap: 4,
+  },
+  logReportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logReportDate: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  logReportWater: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  logReportMeta: {
+    gap: 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+    paddingTop: 4,
+  },
+  logReportText: {
+    fontSize: 12,
+  },
+  logReportNote: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: '#546E5A',
+  },
+  logReportChips: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  miniChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  miniChipText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1C3A24',
+  },
+  chipSuccess: {
+    backgroundColor: '#C8E6C9',
+  },
+  chipError: {
+    backgroundColor: '#FFCDD2',
+  },
+  boldText: {
+    fontWeight: 'bold',
   },
 
   // Modal Styles

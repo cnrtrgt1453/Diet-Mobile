@@ -26,6 +26,16 @@ export default function HomeScreen() {
   const [appTime, setAppTime] = useState('');
   const [appNote, setAppNote] = useState('');
 
+  // Günlük Takip Modülü Form State'leri
+  const [waterIntake, setWaterIntake] = useState(0); // in ml
+  const [sideEffectLevel, setSideEffectLevel] = useState(0); // 1-5
+  const [selectedSideEffects, setSelectedSideEffects] = useState<string[]>([]);
+  const [painLevel, setPainLevel] = useState(0); // 1-5
+  const [glutenFree, setGlutenFree] = useState(true);
+  const [sugarFree, setSugarFree] = useState(true);
+  const [dairyFree, setDairyFree] = useState(true);
+  const [hormonalPhase, setHormonalPhase] = useState('Foliküler Faz');
+
   // Danışan ekleme modalı state'leri
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [name, setName] = useState('');
@@ -79,6 +89,23 @@ export default function HomeScreen() {
           headers: { Authorization: `Bearer ${userToken}` }
         });
         setMyAppointments(resApps.data);
+
+        // Bugünün günlük durum logunu çek (Varsa formları doldur)
+        const resLog = await axios.get(`${API_BASE_URL}/api/v1/logs/daily/my`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayLog = resLog.data.find((log: any) => log.logDate === todayStr);
+        if (todayLog) {
+          setWaterIntake(todayLog.waterIntakeMl || 0);
+          setSideEffectLevel(todayLog.glp1SideEffectLevel || 0);
+          setSelectedSideEffects(todayLog.glp1SideEffects ? todayLog.glp1SideEffects.split(', ') : []);
+          setPainLevel(todayLog.lipedemaPainLevel || 0);
+          setGlutenFree(todayLog.glutenFreeCompliant !== false);
+          setSugarFree(todayLog.sugarFreeCompliant !== false);
+          setDairyFree(todayLog.dairyFreeCompliant !== false);
+          setHormonalPhase(todayLog.currentHormonalPhase || 'Foliküler Faz');
+        }
       }
     } catch (e: any) {
       console.error("Data load error in dashboard:", e.message);
@@ -194,6 +221,29 @@ export default function HomeScreen() {
       loadData();
     } catch (e) {
       Alert.alert("Hata", "İşlem gerçekleştirilemedi.");
+    }
+  };
+
+  // Günlük log kaydet
+  const handleSaveDailyLog = async () => {
+    try {
+      const payload: any = {
+        waterIntakeMl: waterIntake,
+        glp1SideEffectLevel: userInfo?.category === 'GLP_1' ? sideEffectLevel : null,
+        glp1SideEffects: userInfo?.category === 'GLP_1' ? selectedSideEffects.join(', ') : null,
+        lipedemaPainLevel: userInfo?.category === 'LIPEDEMA' ? painLevel : null,
+        glutenFreeCompliant: userInfo?.category === 'LIPEDEMA' ? glutenFree : null,
+        sugarFreeCompliant: userInfo?.category === 'LIPEDEMA' ? sugarFree : null,
+        dairyFreeCompliant: userInfo?.category === 'LIPEDEMA' ? dairyFree : null,
+        currentHormonalPhase: userInfo?.category === 'HORMONAL_BALANCE' ? hormonalPhase : null
+      };
+
+      await axios.post(`${API_BASE_URL}/api/v1/logs/daily`, payload, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Günlük durum kaydınız kaydedildi! 🌟");
+    } catch (e) {
+      Alert.alert("Hata", "Günlük durum verileri kaydedilemedi.");
     }
   };
 
@@ -458,6 +508,148 @@ export default function HomeScreen() {
                 <ThemedText style={styles.noDietText}>📭 Diyetisyeniniz henüz bugün için bir diyet planı atamadı.</ThemedText>
               </View>
             )}
+
+            {/* Gelişmiş Günlük Takip Günlüğü (Faz 1) */}
+            <ThemedText style={styles.sectionTitle}>📝 Günlük Takip Kaydınız (Şüheda Terat Klinik)</ThemedText>
+            <View style={[styles.dailyLogCard, { backgroundColor: theme.backgroundElement }]}>
+              
+              {/* Su Girişi */}
+              <View style={styles.logSubRow}>
+                <View>
+                  <ThemedText style={styles.logSubLabel}>💧 Günlük Su Tüketimi</ThemedText>
+                  <ThemedText style={styles.logSubDesc}>Hedef: 2500 - 3000 ml</ThemedText>
+                </View>
+                <View style={styles.waterControls}>
+                  <TouchableOpacity style={[styles.waterBtn, { backgroundColor: theme.backgroundSelected }]} onPress={() => setWaterIntake(Math.max(0, waterIntake - 250))}>
+                    <ThemedText style={styles.waterBtnText}>-</ThemedText>
+                  </TouchableOpacity>
+                  <ThemedText style={styles.waterText}>{waterIntake} ml</ThemedText>
+                  <TouchableOpacity style={[styles.waterBtn, { backgroundColor: theme.backgroundSelected }]} onPress={() => setWaterIntake(waterIntake + 250)}>
+                    <ThemedText style={styles.waterBtnText}>+</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Kategori Özel Takip: GLP-1 */}
+              {userInfo?.category === 'GLP_1' && (
+                <View style={styles.logCategoryCard}>
+                  <ThemedText style={styles.logSubLabel}>💉 GLP-1 Yan Etki Düzeyi ({sideEffectLevel}/5)</ThemedText>
+                  <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[styles.ratingBtn, sideEffectLevel === num ? { backgroundColor: theme.primary } : { backgroundColor: '#FFFFFF' }]}
+                        onPress={() => setSideEffectLevel(num)}
+                      >
+                        <ThemedText style={[styles.ratingText, sideEffectLevel === num ? { color: '#FFFFFF', fontWeight: 'bold' } : { color: theme.text }]}>{num}</ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <ThemedText style={styles.logSubLabel}>Hissedilen Belirtiler</ThemedText>
+                  <View style={styles.symptomsRow}>
+                    {['Mide Bulantısı', 'Kabızlık', 'Halsizlik', 'Baş Ağrısı', 'İştahsızlık'].map((sym) => {
+                      const selected = selectedSideEffects.includes(sym);
+                      return (
+                        <TouchableOpacity
+                          key={sym}
+                          style={[
+                            styles.symptomChip,
+                            selected ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.backgroundSelected, backgroundColor: '#FFFFFF' }
+                          ]}
+                          onPress={() => {
+                            if (selected) {
+                              setSelectedSideEffects(selectedSideEffects.filter(s => s !== sym));
+                            } else {
+                              setSelectedSideEffects([...selectedSideEffects, sym]);
+                            }
+                          }}
+                        >
+                          <ThemedText style={[styles.symptomChipText, selected ? { color: '#FFFFFF' } : { color: theme.text }]}>{sym}</ThemedText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Kategori Özel Takip: Lipödem */}
+              {userInfo?.category === 'LIPEDEMA' && (
+                <View style={styles.logCategoryCard}>
+                  <ThemedText style={styles.logSubLabel}>🦵 Bacak Ağrısı / Hassasiyet ({painLevel}/5)</ThemedText>
+                  <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <TouchableOpacity
+                        key={num}
+                        style={[styles.ratingBtn, painLevel === num ? { backgroundColor: theme.primary } : { backgroundColor: '#FFFFFF' }]}
+                        onPress={() => setPainLevel(num)}
+                      >
+                        <ThemedText style={[styles.ratingText, painLevel === num ? { color: '#FFFFFF', fontWeight: 'bold' } : { color: theme.text }]}>{num}</ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <ThemedText style={styles.logSubLabel}>Anti-Ödem Beslenme Uyumu</ThemedText>
+                  <View style={styles.complianceRow}>
+                    <TouchableOpacity 
+                      style={[styles.complianceCard, glutenFree ? { backgroundColor: '#C8E6C9' } : { backgroundColor: '#FFCDD2' }]}
+                      onPress={() => setGlutenFree(!glutenFree)}
+                    >
+                      <ThemedText style={styles.complianceText}>{glutenFree ? '✓ Glütensiz' : '✗ Glütenli'}</ThemedText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.complianceCard, sugarFree ? { backgroundColor: '#C8E6C9' } : { backgroundColor: '#FFCDD2' }]}
+                      onPress={() => setSugarFree(!sugarFree)}
+                    >
+                      <ThemedText style={styles.complianceText}>{sugarFree ? '✓ Şekersiz' : '✗ Şekerli'}</ThemedText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.complianceCard, dairyFree ? { backgroundColor: '#C8E6C9' } : { backgroundColor: '#FFCDD2' }]}
+                      onPress={() => setDairyFree(!dairyFree)}
+                    >
+                      <ThemedText style={styles.complianceText}>{dairyFree ? '✓ Sütsüz' : '✗ Sütlü'}</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Kategori Özel Takip: Hormonal Denge */}
+              {userInfo?.category === 'HORMONAL_BALANCE' && (
+                <View style={styles.logCategoryCard}>
+                  <ThemedText style={styles.logSubLabel}>🧬 Döngü Durumu (Regl Fazı)</ThemedText>
+                  <View style={styles.categorySelectRow}>
+                    {['Menstrüasyon', 'Foliküler Faz', 'Ovülasyon', 'Luteal Faz'].map((phase) => (
+                      <TouchableOpacity
+                        key={phase}
+                        style={[
+                          styles.categorySelectBtn,
+                          { borderColor: theme.primary, marginBottom: 6 },
+                          hormonalPhase === phase ? { backgroundColor: theme.primary } : { backgroundColor: '#FFFFFF' }
+                        ]}
+                        onPress={() => setHormonalPhase(phase)}
+                      >
+                        <ThemedText style={[
+                          styles.categorySelectBtnText,
+                          hormonalPhase === phase ? { color: '#FFFFFF', fontWeight: 'bold' } : { color: theme.primary }
+                        ]}>
+                          {phase}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity 
+                style={[styles.saveLogBtn, { backgroundColor: theme.primary }]}
+                onPress={handleSaveDailyLog}
+              >
+                <ThemedText style={styles.saveLogBtnText}>Bugünkü Durumu Kaydet</ThemedText>
+              </TouchableOpacity>
+
+            </View>
 
             {/* Randevu İsteme & Durumları */}
             <View style={styles.rowBetween}>
@@ -1003,6 +1195,115 @@ const styles = StyleSheet.create({
   creditsLocation: {
     fontSize: 12,
     color: '#546E5A',
+  },
+
+  // Günlük Takip Kartı
+  dailyLogCard: {
+    padding: Spacing.four,
+    borderRadius: 18,
+    gap: Spacing.three,
+  },
+  logSubRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logSubLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1C3A24',
+  },
+  logSubDesc: {
+    fontSize: 11,
+    color: '#546E5A',
+  },
+  waterControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  waterBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waterBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  waterText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  logCategoryCard: {
+    gap: Spacing.two,
+    borderTopWidth: 1,
+    borderTopColor: '#C5DFCC',
+    paddingTop: Spacing.two,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: Spacing.half,
+  },
+  ratingBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#C5DFCC',
+  },
+  ratingText: {
+    fontSize: 15,
+  },
+  symptomsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+  },
+  symptomChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  symptomChipText: {
+    fontSize: 12,
+  },
+  complianceRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginVertical: Spacing.half,
+  },
+  complianceCard: {
+    flex: 1,
+    padding: Spacing.two,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  complianceText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#1C3A24',
+  },
+  saveLogBtn: {
+    height: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.one,
+  },
+  saveLogBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 
   // Randevu Talepleri (Diyetisyen)
