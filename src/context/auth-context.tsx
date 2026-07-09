@@ -2,9 +2,10 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { CustomAlert } from '../components/custom-alert';
 
 // Android emulator local bilgisayardaki backend'e erişmek için 10.0.2.2 kullanır. iOS için localhost.
-export const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
+export const API_BASE_URL = 'http://192.168.1.140:8080';
 
 interface AuthContextType {
   isLoading: boolean;
@@ -12,6 +13,8 @@ interface AuthContextType {
   userInfo: any | null;
   login: (provider: 'google' | 'facebook', socialToken: string) => Promise<void>;
   logout: () => Promise<void>;
+  showAlert: (title: string, message: string, type?: 'success' | 'error') => void;
+  refreshUserInfo: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +23,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<any | null>(null);
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'success',
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setAlertConfig({
+      visible: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const refreshUserInfo = async () => {
+    if (!userToken) return;
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/test/me`, {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      setUserInfo(response.data);
+    } catch (e) {
+      console.error('Failed to refresh user info:', e);
+    }
+  };
 
   // Uygulama açılışında kayıtlı JWT'yi kontrol et ve doğrula
   useEffect(() => {
@@ -84,8 +119,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isLoading, userToken, userInfo, login, logout }}>
+    <AuthContext.Provider value={{ isLoading, userToken, userInfo, login, logout, showAlert, refreshUserInfo }}>
       {children}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </AuthContext.Provider>
   );
 };

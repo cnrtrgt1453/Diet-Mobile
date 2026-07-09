@@ -12,14 +12,14 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, showAlert } = useAuth();
   const [isMockMode, setIsMockMode] = useState(true); // Geliştirme kolaylığı için varsayılan true
 
   // Google OAuth Talebi Yapılandırması (Kendi ID'lerinizi buraya ekleyebilirsiniz)
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
     androidClientId: 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com',
     iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
-    webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+    webClientId: '1084592554421-uou6riks1a4ej720oec3k1t6ejoc2q3j.apps.googleusercontent.com',
   });
 
   // Facebook OAuth Talebi Yapılandırması (Kendi App ID'nizi buraya ekleyebilirsiniz)
@@ -50,9 +50,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const handleSocialLogin = async (provider: 'google' | 'facebook', token: string) => {
     try {
       await login(provider, token);
-      Alert.alert('Başarılı', `${provider === 'google' ? 'Google' : 'Facebook'} ile başarıyla giriş yapıldı.`);
+      showAlert('Başarılı', `${provider === 'google' ? 'Google' : 'Facebook'} ile başarıyla giriş yapıldı.`, 'success');
     } catch (err: any) {
-      Alert.alert('Giriş Hatası', 'Kimlik doğrulanırken bir sorun oluştu.');
+      showAlert('Giriş Hatası', 'Kimlik doğrulanırken bir sorun oluştu.', 'error');
     }
   };
 

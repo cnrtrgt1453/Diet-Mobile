@@ -6,11 +6,12 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import { AuthProvider, useAuth } from '../context/auth-context';
 import { LoginScreen } from '../screens/login-screen';
+import { CompleteProfileScreen } from '../screens/complete-profile-screen';
 
 SplashScreen.preventAutoHideAsync();
 
 function MainAppContent() {
-  const { userToken, isLoading } = useAuth();
+  const { userToken, userInfo, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -22,6 +23,11 @@ function MainAppContent() {
 
   if (!userToken) {
     return <LoginScreen />;
+  }
+
+  // Eğer giriş yapan kullanıcı danışan ise ve henüz profilini kurmadıysa
+  if (userInfo?.role === 'ROLE_USER' && (userInfo?.height === null || userInfo?.category === null)) {
+    return <CompleteProfileScreen />;
   }
 
   return <AppTabs />;
