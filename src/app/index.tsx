@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Platform, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal } from 'react-native';
+import { Platform, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,12 +11,17 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
 
 export default function HomeScreen() {
-  const { userInfo, userToken, logout } = useAuth();
+  const { userInfo, userToken, logout, showAlert } = useAuth();
   const theme = useTheme();
   
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({ total: 0, glp1: 0, lipedema: 0, weightManagement: 0, hormonalBalance: 0 });
   const [todayDiet, setTodayDiet] = useState<any>(null);
+
+  // Bildirim State'leri
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotifModalVisible, setIsNotifModalVisible] = useState(false);
   
   // Randevu State'leri
   const [pendingAppointments, setPendingAppointments] = useState<any[]>([]);
@@ -52,8 +58,111 @@ export default function HomeScreen() {
 
   const isDietitian = userInfo?.role === 'ROLE_DIETITIAN';
 
+  // Bildirimleri Çek
+  const loadNotifications = useCallback(async () => {
+    if (!userToken) return;
+    try {
+      const resNotifs = await axios.get(`${API_BASE_URL}/api/v1/notifications`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setNotifications(resNotifs.data);
+
+      const resCount = await axios.get(`${API_BASE_URL}/api/v1/notifications/unread/count`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setUnreadCount(resCount.data);
+    } catch (e) {
+      console.error("Failed to load notifications:", e);
+    }
+  }, [userToken]);
+
+  // Bildirimi Okundu İşaretle
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/notifications/${id}/read`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      loadNotifications();
+    } catch (e) {
+      console.error("Failed to mark notification as read:", e);
+    }
+  };
+
+  // Hepsini Okundu İşaretle
+  const handleMarkAllAsRead = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/notifications/read-all`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      loadNotifications();
+    } catch (e) {
+      console.error("Failed to mark all as read:", e);
+    }
+  };
+
+  // Çevrimdışı log kaydetme yardımcısı
+  const saveLogOffline = async (payload: any) => {
+    try {
+      const queueStr = await SecureStore.getItemAsync('@offline_logs_queue');
+      let queue = queueStr ? JSON.parse(queueStr) : [];
+      
+      const existingIndex = queue.findIndex((item: any) => item.logDate === payload.logDate);
+      if (existingIndex > -1) {
+        queue[existingIndex] = payload;
+      } else {
+        queue.push(payload);
+      }
+      
+      await SecureStore.setItemAsync('@offline_logs_queue', JSON.stringify(queue));
+      await SecureStore.setItemAsync('@cached_today_log', JSON.stringify(payload));
+    } catch (err) {
+      console.error('Failed to save log offline:', err);
+    }
+  };
+
+  // Çevrimdışı logları senkronize etme
+  const syncOfflineLogs = useCallback(async () => {
+    try {
+      const queueStr = await SecureStore.getItemAsync('@offline_logs_queue');
+      if (!queueStr) return;
+      
+      const queue = JSON.parse(queueStr);
+      if (queue.length === 0) return;
+      
+      const remainingQueue = [];
+      let successCount = 0;
+      
+      for (const log of queue) {
+        try {
+          await axios.post(`${API_BASE_URL}/api/v1/logs/daily`, log, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          successCount++;
+        } catch (err: any) {
+          if (!err.response || err.message === 'Network Error') {
+            remainingQueue.push(log);
+          }
+        }
+      }
+      
+      await SecureStore.setItemAsync('@offline_logs_queue', JSON.stringify(remainingQueue));
+      
+      if (successCount > 0) {
+        showAlert('Eşitleme Başarılı', `${successCount} adet çevrimdışı günlük kaydınız başarıyla senkronize edildi! 🔄`, 'success');
+        loadData();
+      }
+    } catch (err) {
+      console.error('Failed to sync offline logs:', err);
+    }
+  }, [userToken, showAlert]);
+
   const loadData = useCallback(async () => {
     if (!userToken) return;
+
+    if (!isDietitian) {
+      syncOfflineLogs();
+    }
+
     try {
       if (isDietitian) {
         // İstatistikleri çek
@@ -74,28 +183,60 @@ export default function HomeScreen() {
         });
         setApprovedAppointments(resApproved.data);
       } else {
+        // --- DANIŞAN GİRİŞİ ---
         // Bugünün diyetini çek
-        const resDiet = await axios.get(`${API_BASE_URL}/api/v1/diets/my/today`, {
-          headers: { Authorization: `Bearer ${userToken}` }
-        });
-        if (typeof resDiet.data === 'object') {
-          setTodayDiet(resDiet.data);
-        } else {
-          setTodayDiet(null);
+        try {
+          const resDiet = await axios.get(`${API_BASE_URL}/api/v1/diets/my/today`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          if (typeof resDiet.data === 'object') {
+            setTodayDiet(resDiet.data);
+            await SecureStore.setItemAsync('@cached_today_diet', JSON.stringify(resDiet.data));
+          } else {
+            setTodayDiet(null);
+            await SecureStore.deleteItemAsync('@cached_today_diet');
+          }
+        } catch (e) {
+          const cachedDiet = await SecureStore.getItemAsync('@cached_today_diet');
+          if (cachedDiet) {
+            setTodayDiet(JSON.parse(cachedDiet));
+          }
         }
 
         // Danışanın randevularını çek
-        const resApps = await axios.get(`${API_BASE_URL}/api/v1/appointments/my`, {
-          headers: { Authorization: `Bearer ${userToken}` }
-        });
-        setMyAppointments(resApps.data);
+        try {
+          const resApps = await axios.get(`${API_BASE_URL}/api/v1/appointments/my`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          setMyAppointments(resApps.data);
+          await SecureStore.setItemAsync('@cached_my_appointments', JSON.stringify(resApps.data));
+        } catch (e) {
+          const cachedApps = await SecureStore.getItemAsync('@cached_my_appointments');
+          if (cachedApps) {
+            setMyAppointments(JSON.parse(cachedApps));
+          }
+        }
 
-        // Bugünün günlük durum logunu çek (Varsa formları doldur)
-        const resLog = await axios.get(`${API_BASE_URL}/api/v1/logs/daily/my`, {
-          headers: { Authorization: `Bearer ${userToken}` }
-        });
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayLog = resLog.data.find((log: any) => log.logDate === todayStr);
+        // Bugünün günlük durum logunu çek
+        let todayLog = null;
+        try {
+          const resLog = await axios.get(`${API_BASE_URL}/api/v1/logs/daily/my`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          const todayStr = new Date().toISOString().split('T')[0];
+          todayLog = resLog.data.find((log: any) => log.logDate === todayStr);
+          if (todayLog) {
+            await SecureStore.setItemAsync('@cached_today_log', JSON.stringify(todayLog));
+          } else {
+            await SecureStore.deleteItemAsync('@cached_today_log');
+          }
+        } catch (e) {
+          const cachedLog = await SecureStore.getItemAsync('@cached_today_log');
+          if (cachedLog) {
+            todayLog = JSON.parse(cachedLog);
+          }
+        }
+
         if (todayLog) {
           setWaterIntake(todayLog.waterIntakeMl || 0);
           setSideEffectLevel(todayLog.glp1SideEffectLevel || 0);
@@ -110,11 +251,19 @@ export default function HomeScreen() {
     } catch (e: any) {
       console.error("Data load error in dashboard:", e.message);
     }
-  }, [userToken, isDietitian]);
+  }, [userToken, isDietitian, syncOfflineLogs]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Bildirimleri periyodik sorgula
+  useEffect(() => {
+    if (!userToken) return;
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [userToken, loadNotifications]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -226,24 +375,32 @@ export default function HomeScreen() {
 
   // Günlük log kaydet
   const handleSaveDailyLog = async () => {
-    try {
-      const payload: any = {
-        waterIntakeMl: waterIntake,
-        glp1SideEffectLevel: userInfo?.category === 'GLP_1' ? sideEffectLevel : null,
-        glp1SideEffects: userInfo?.category === 'GLP_1' ? selectedSideEffects.join(', ') : null,
-        lipedemaPainLevel: userInfo?.category === 'LIPEDEMA' ? painLevel : null,
-        glutenFreeCompliant: userInfo?.category === 'LIPEDEMA' ? glutenFree : null,
-        sugarFreeCompliant: userInfo?.category === 'LIPEDEMA' ? sugarFree : null,
-        dairyFreeCompliant: userInfo?.category === 'LIPEDEMA' ? dairyFree : null,
-        currentHormonalPhase: userInfo?.category === 'HORMONAL_BALANCE' ? hormonalPhase : null
-      };
+    const todayStr = new Date().toISOString().split('T')[0];
+    const payload: any = {
+      logDate: todayStr,
+      waterIntakeMl: waterIntake,
+      glp1SideEffectLevel: userInfo?.category === 'GLP_1' ? sideEffectLevel : null,
+      glp1SideEffects: userInfo?.category === 'GLP_1' ? selectedSideEffects.join(', ') : null,
+      lipedemaPainLevel: userInfo?.category === 'LIPEDEMA' ? painLevel : null,
+      glutenFreeCompliant: userInfo?.category === 'LIPEDEMA' ? glutenFree : null,
+      sugarFreeCompliant: userInfo?.category === 'LIPEDEMA' ? sugarFree : null,
+      dairyFreeCompliant: userInfo?.category === 'LIPEDEMA' ? dairyFree : null,
+      currentHormonalPhase: userInfo?.category === 'HORMONAL_BALANCE' ? hormonalPhase : null
+    };
 
+    try {
       await axios.post(`${API_BASE_URL}/api/v1/logs/daily`, payload, {
         headers: { Authorization: `Bearer ${userToken}` }
       });
-      Alert.alert("Başarılı", "Günlük durum kaydınız kaydedildi! 🌟");
-    } catch (e) {
-      Alert.alert("Hata", "Günlük durum verileri kaydedilemedi.");
+      await SecureStore.setItemAsync('@cached_today_log', JSON.stringify(payload));
+      showAlert("Başarılı", "Günlük durum kaydınız kaydedildi! 🌟", "success");
+    } catch (err: any) {
+      if (!err.response || err.message === 'Network Error') {
+        await saveLogOffline(payload);
+        showAlert("Çevrimdışı Kayıt", "İnternet bağlantısı bulunamadı. Günlük durum kaydınız cihazınıza kaydedildi ve internet bağlantısı kurulduğunda eşitlenecektir.", "success");
+      } else {
+        showAlert("Hata", "Günlük durum verileri kaydedilemedi.", "error");
+      }
     }
   };
 
@@ -297,9 +454,24 @@ export default function HomeScreen() {
               {userInfo?.name || "Kullanıcı"}
             </ThemedText>
           </View>
-          <TouchableOpacity style={[styles.logoutBtn, { borderColor: theme.textSecondary }]} onPress={logout}>
-            <ThemedText style={[styles.logoutText, { color: theme.textSecondary }]}>Çıkış</ThemedText>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Bildirim Zili */}
+            <TouchableOpacity 
+              style={[styles.notifBellBtn, { backgroundColor: theme.backgroundElement }]} 
+              onPress={() => setIsNotifModalVisible(true)}
+            >
+              <Text style={styles.notifBellIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.logoutBtn, { borderColor: theme.textSecondary }]} onPress={logout}>
+              <ThemedText style={[styles.logoutText, { color: theme.textSecondary }]}>Çıkış</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {isDietitian ? (
@@ -939,6 +1111,62 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* BİLDİRİM MODALI */}
+      <Modal
+        visible={isNotifModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsNotifModalVisible(false)}
+      >
+        <View style={styles.notifModalOverlay}>
+          <View style={[styles.notifModalContent, { backgroundColor: theme.background }]}>
+            <View style={styles.notifModalHeader}>
+              <ThemedText type="subtitle" style={styles.notifModalTitle}>🔔 Bildirimler</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsNotifModalVisible(false)}>
+                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+
+            {notifications.length > 0 && (
+              <TouchableOpacity style={styles.notifMarkAllBtn} onPress={handleMarkAllAsRead}>
+                <Text style={styles.notifMarkAllText}>Hepsini Okundu İşaretle</Text>
+              </TouchableOpacity>
+            )}
+
+            <ScrollView contentContainerStyle={styles.notifList}>
+              {notifications.length === 0 ? (
+                <View style={styles.notifEmpty}>
+                  <Text style={styles.notifEmptyText}>Henüz bir bildiriminiz bulunmuyor.</Text>
+                </View>
+              ) : (
+                notifications.map((notif) => (
+                  <TouchableOpacity
+                    key={notif.id}
+                    style={[
+                      styles.notifCard,
+                      { backgroundColor: theme.backgroundElement },
+                      !notif.read && styles.notifUnreadBorder
+                    ]}
+                    onPress={() => handleMarkAsRead(notif.id)}
+                  >
+                    <View style={styles.notifHeaderRow}>
+                      <Text style={[styles.notifTitle, !notif.read && styles.notifTitleUnread]}>
+                        {notif.title}
+                      </Text>
+                      {!notif.read && <View style={styles.unreadDot} />}
+                    </View>
+                    <Text style={styles.notifMessage}>{notif.message}</Text>
+                    <Text style={styles.notifDate}>
+                      {new Date(notif.createdAt).toLocaleDateString('tr-TR')} {new Date(notif.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -1520,5 +1748,140 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // Notification Styles
+  notifBellBtn: {
+    padding: Spacing.two,
+    borderRadius: Spacing.two,
+    position: 'relative',
+    marginRight: Spacing.two,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notifBellIcon: {
+    fontSize: 22,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#D32F2F',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  notifModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  notifModalContent: {
+    height: '80%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  notifModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.three,
+  },
+  notifModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  notifCloseBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFEBEE',
+  },
+  notifCloseBtnText: {
+    fontWeight: 'bold',
+    color: '#D32F2F',
+    fontSize: 13,
+  },
+  notifMarkAllBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: Spacing.three,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  notifMarkAllText: {
+    fontSize: 13,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  notifList: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.four,
+  },
+  notifEmpty: {
+    paddingVertical: Spacing.eight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifEmptyText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  notifCard: {
+    padding: Spacing.three,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+    position: 'relative',
+  },
+  notifUnreadBorder: {
+    borderColor: '#A5D6A7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2E7D32',
+  },
+  notifHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  notifTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333333',
+    flex: 1,
+  },
+  notifTitleUnread: {
+    fontWeight: 'bold',
+    color: '#1B5E20',
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2E7D32',
+    marginLeft: 8,
+  },
+  notifMessage: {
+    fontSize: 13,
+    color: '#666666',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  notifDate: {
+    fontSize: 11,
+    color: '#999999',
+    textAlign: 'right',
   },
 });
