@@ -12,6 +12,7 @@ interface AuthContextType {
   userToken: string | null;
   userInfo: any | null;
   login: (provider: 'google' | 'facebook', socialToken: string) => Promise<void>;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   showAlert: (title: string, message: string, type?: 'success' | 'error') => void;
   refreshUserInfo: () => Promise<void>;
@@ -105,6 +106,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithPassword = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const endpoint = `${API_BASE_URL}/api/v1/auth/login`;
+      const response = await axios.post(endpoint, { email: email.trim().toLowerCase(), password });
+      
+      const { accessToken } = response.data;
+      
+      await SecureStore.setItemAsync('userToken', accessToken);
+      setUserToken(accessToken);
+      
+      // Kullanıcı bilgilerini al
+      const userRes = await axios.get(`${API_BASE_URL}/api/v1/test/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setUserInfo(userRes.data);
+    } catch (error: any) {
+      console.error('Password login error:', error.response?.data || error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -119,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isLoading, userToken, userInfo, login, logout, showAlert, refreshUserInfo }}>
+    <AuthContext.Provider value={{ isLoading, userToken, userInfo, login, loginWithPassword, logout, showAlert, refreshUserInfo }}>
       {children}
       <CustomAlert
         visible={alertConfig.visible}

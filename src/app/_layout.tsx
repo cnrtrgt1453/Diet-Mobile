@@ -7,6 +7,7 @@ import AppTabs from '@/components/app-tabs';
 import { AuthProvider, useAuth } from '../context/auth-context';
 import { LoginScreen } from '../screens/login-screen';
 import { CompleteProfileScreen } from '../screens/complete-profile-screen';
+import { ApplicationStatusScreen } from '../screens/application-status-screen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,6 +24,11 @@ function MainAppContent() {
 
   if (!userToken) {
     return <LoginScreen />;
+  }
+
+  // Eğer kullanıcının diyetisyenlik başvurusu askıdaysa veya reddedildiyse
+  if (userInfo?.dietitianApplicationStatus === 'PENDING' || userInfo?.dietitianApplicationStatus === 'REJECTED') {
+    return <ApplicationStatusScreen />;
   }
 
   // Eğer giriş yapan kullanıcı danışan ise ve henüz profilini kurmadıysa

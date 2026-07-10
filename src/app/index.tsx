@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Platform, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal, Text } from 'react-native';
+import { Platform, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal, Text, Linking, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
@@ -11,7 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
 
 export default function HomeScreen() {
-  const { userInfo, userToken, logout, showAlert } = useAuth();
+  const { userInfo, userToken, logout, showAlert, refreshUserInfo } = useAuth();
   const theme = useTheme();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -31,6 +31,146 @@ export default function HomeScreen() {
   const [appDate, setAppDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
   const [appTime, setAppTime] = useState('');
   const [appNote, setAppNote] = useState('');
+
+  // Admin Diyetisyen Başvuru State'leri
+  const [applications, setApplications] = useState<any[]>([]);
+  const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  // Diyetisyen Profil Düzenleme State'leri
+  const [isEditProfileModalVisible, setIsEditProfileModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editInstagram, setEditInstagram] = useState('');
+  const [editLinkedin, setEditLinkedin] = useState('');
+  const [editYoutube, setEditYoutube] = useState('');
+  const [editProfilePicture, setEditProfilePicture] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Danışan Profil Düzenleme State'leri
+  const [isClientEditModalVisible, setIsClientEditModalVisible] = useState(false);
+  const [clientEditName, setClientEditName] = useState('');
+  const [clientEditHeight, setClientEditHeight] = useState('');
+  const [clientEditCurrentWeight, setClientEditCurrentWeight] = useState('');
+  const [clientEditTargetWeight, setClientEditTargetWeight] = useState('');
+  const [clientEditCategory, setClientEditCategory] = useState<'WEIGHT_MANAGEMENT' | 'GLP_1' | 'LIPEDEMA' | 'HORMONAL_BALANCE'>('WEIGHT_MANAGEMENT');
+  const [clientEditGlp1Day, setClientEditGlp1Day] = useState('Pazartesi');
+  const [clientEditGlp1Dosage, setClientEditGlp1Dosage] = useState('0.25 mg');
+  const [clientEditLipedemaStage, setClientEditLipedemaStage] = useState('1');
+  const [clientEditAntiInflammatory, setClientEditAntiInflammatory] = useState(true);
+  const [clientEditHormoneCycle, setClientEditHormoneCycle] = useState('Foliküler Faz');
+  const [isSavingClientProfile, setIsSavingClientProfile] = useState(false);
+
+  // Diyetisyen bulma & talep listesi state'leri
+  const [dietitians, setDietitians] = useState<any[]>([]);
+  const [connectionRequests, setConnectionRequests] = useState<any[]>([]);
+  const [isFindDietitianModalVisible, setIsFindDietitianModalVisible] = useState(false);
+  const [isLoadingDietitians, setIsLoadingDietitians] = useState(false);
+
+  const loadDietDataForFinder = async () => {
+    setIsLoadingDietitians(true);
+    try {
+      const resDietitians = await axios.get(`${API_BASE_URL}/api/v1/connections/dietitians`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setDietitians(resDietitians.data);
+
+      const resMyReqs = await axios.get(`${API_BASE_URL}/api/v1/connections/my-requests`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setConnectionRequests(resMyReqs.data);
+    } catch (e) {
+      console.error("Failed to load dietitian finder data:", e);
+    } finally {
+      setIsLoadingDietitians(false);
+    }
+  };
+
+  // Chat ve Broadcast State'leri
+  const [isChatModalVisible, setIsChatModalVisible] = useState(false);
+  const [chatWithUser, setChatWithUser] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [typedMessage, setTypedMessage] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // Broadcast Modal State'leri
+  const [isBroadcastModalVisible, setIsBroadcastModalVisible] = useState(false);
+  const [broadcastText, setBroadcastText] = useState('');
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+
+  const fetchChatHistory = useCallback(async () => {
+    if (!userToken || !chatWithUser) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/messages/history/${chatWithUser.id}`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setChatMessages(res.data);
+    } catch (e) {
+      console.error("Failed to load chat history:", e);
+    }
+  }, [userToken, chatWithUser]);
+
+  useEffect(() => {
+    if (!isChatModalVisible || !chatWithUser) return;
+    fetchChatHistory();
+    const interval = setInterval(fetchChatHistory, 4000); // Poll every 4 seconds
+    return () => clearInterval(interval);
+  }, [isChatModalVisible, chatWithUser, fetchChatHistory]);
+
+  const handleSendChatMessage = async () => {
+    if (!typedMessage.trim() || !chatWithUser) return;
+    setIsSendingMessage(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/messages/send/${chatWithUser.id}`, {
+        content: typedMessage.trim()
+      }, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setTypedMessage('');
+      fetchChatHistory();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Mesaj gönderilemedi.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastText.trim()) {
+      Alert.alert("Hata", "Lütfen duyuru içeriği giriniz.");
+      return;
+    }
+    setIsSendingBroadcast(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/messages/broadcast`, {
+        content: broadcastText.trim()
+      }, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Toplu duyuru tüm danışanlarınıza gönderildi.");
+      setIsBroadcastModalVisible(false);
+      setBroadcastText('');
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Toplu duyuru gönderilemedi.");
+    } finally {
+      setIsSendingBroadcast(false);
+    }
+  };
+
+  const openClientEditProfile = () => {
+    setClientEditName(userInfo?.name || '');
+    setClientEditHeight(userInfo?.height?.toString() || '');
+    setClientEditCurrentWeight(userInfo?.currentWeight?.toString() || '');
+    setClientEditTargetWeight(userInfo?.targetWeight?.toString() || '');
+    setClientEditCategory(userInfo?.category || 'WEIGHT_MANAGEMENT');
+    setClientEditGlp1Day(userInfo?.glp1InjectionDay || 'Pazartesi');
+    setClientEditGlp1Dosage(userInfo?.glp1Dosage || '0.25 mg');
+    setClientEditLipedemaStage(userInfo?.lipedemaStage?.toString() || '1');
+    setClientEditAntiInflammatory(userInfo?.antiInflammatoryCompliant !== false);
+    setClientEditHormoneCycle(userInfo?.hormoneTargetCycle || 'Foliküler Faz');
+    setIsClientEditModalVisible(true);
+  };
 
   // Günlük Takip Modülü Form State'leri
   const [waterIntake, setWaterIntake] = useState(0); // in ml
@@ -57,6 +197,7 @@ export default function HomeScreen() {
   const [hormoneTargetCycle, setHormoneTargetCycle] = useState('');
 
   const isDietitian = userInfo?.role === 'ROLE_DIETITIAN';
+  const isAdmin = userInfo?.role === 'ROLE_DIETITIAN' && userInfo?.email === 'suhedaterat2@gmail.com';
 
   // Bildirimleri Çek
   const loadNotifications = useCallback(async () => {
@@ -182,8 +323,36 @@ export default function HomeScreen() {
           headers: { Authorization: `Bearer ${userToken}` }
         });
         setApprovedAppointments(resApproved.data);
+
+        // Eğer admin ise diyetisyen başvurularını çek
+        if (userInfo?.email === 'suhedaterat2@gmail.com') {
+          const resApps = await axios.get(`${API_BASE_URL}/api/v1/admin/applications`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          setApplications(resApps.data);
+        }
+
+        // Diyetisyene gelen bekleyen bağlantı isteklerini çek
+        try {
+          const resConn = await axios.get(`${API_BASE_URL}/api/v1/connections/pending-requests`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          setConnectionRequests(resConn.data);
+        } catch (e) {
+          console.error("Failed to load connection requests:", e);
+        }
       } else {
         // --- DANIŞAN GİRİŞİ ---
+        // Danışanın diyetisyene çalışma talepleri listesini çek
+        try {
+          const resMyReqs = await axios.get(`${API_BASE_URL}/api/v1/connections/my-requests`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          setConnectionRequests(resMyReqs.data);
+        } catch (e) {
+          console.error("Failed to load my requests:", e);
+        }
+
         // Bugünün diyetini çek
         try {
           const resDiet = await axios.get(`${API_BASE_URL}/api/v1/diets/my/today`, {
@@ -373,6 +542,168 @@ export default function HomeScreen() {
     }
   };
 
+  // Diyetisyen Başvurusu Onayla
+  const handleApproveApplication = async (id: number) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/admin/applications/${id}/approve`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Başvuru onaylandı. Kullanıcı artık diyetisyen rolündedir.");
+      loadData();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Onaylama işlemi gerçekleştirilemedi.");
+    }
+  };
+
+  // Diyetisyen Başvurusu Reddet
+  const handleRejectApplication = async () => {
+    if (!selectedApplication) return;
+    if (!rejectionReason) {
+      Alert.alert("Hata", "Lütfen red gerekçesi giriniz.");
+      return;
+    }
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/admin/applications/${selectedApplication.id}/reject`, {
+        rejectionReason: rejectionReason
+      }, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Başvuru reddedildi.");
+      setIsRejectModalVisible(false);
+      setRejectionReason('');
+      setSelectedApplication(null);
+      loadData();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Reddetme işlemi gerçekleştirilemedi.");
+    }
+  };
+
+  // Diyetisyen Profilini Güncelle
+  const handleSaveProfile = async () => {
+    if (!editName) {
+      Alert.alert("Hata", "Ad Soyad alanı zorunludur.");
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      await axios.put(`${API_BASE_URL}/api/v1/users/profile`, {
+        name: editName,
+        notes: editNotes,
+        instagramUrl: editInstagram.trim(),
+        linkedinUrl: editLinkedin.trim(),
+        youtubeUrl: editYoutube.trim(),
+        profilePictureUrl: editProfilePicture.trim(),
+      }, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      
+      Alert.alert("Başarılı", "Profil bilgileriniz başarıyla güncellendi.");
+      setIsEditProfileModalVisible(false);
+      await refreshUserInfo();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Profil güncellenirken hata oluştu.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  // Danışan Profilini Güncelle
+  const handleSaveClientProfile = async () => {
+    if (!clientEditName) {
+      Alert.alert("Hata", "Ad Soyad alanı zorunludur.");
+      return;
+    }
+    if (!clientEditHeight || !clientEditCurrentWeight || !clientEditTargetWeight) {
+      Alert.alert("Hata", "Lütfen boy, mevcut kilo ve hedef kilo alanlarını doldurun.");
+      return;
+    }
+
+    const heightNum = parseFloat(clientEditHeight);
+    const weightNum = parseFloat(clientEditCurrentWeight);
+    const targetNum = parseFloat(clientEditTargetWeight);
+
+    if (isNaN(heightNum) || isNaN(weightNum) || isNaN(targetNum)) {
+      Alert.alert("Hata", "Lütfen geçerli sayısal değerler giriniz.");
+      return;
+    }
+
+    setIsSavingClientProfile(true);
+    try {
+      const data: any = {
+        name: clientEditName,
+        height: heightNum,
+        currentWeight: weightNum,
+        targetWeight: targetNum,
+        category: clientEditCategory,
+      };
+
+      if (clientEditCategory === 'GLP_1') {
+        data.glp1InjectionDay = clientEditGlp1Day;
+        data.glp1Dosage = clientEditGlp1Dosage;
+      } else if (clientEditCategory === 'LIPEDEMA') {
+        data.lipedemaStage = parseInt(clientEditLipedemaStage);
+        data.antiInflammatoryCompliant = clientEditAntiInflammatory;
+      } else if (clientEditCategory === 'HORMONAL_BALANCE') {
+        data.hormoneTargetCycle = clientEditHormoneCycle;
+      }
+
+      await axios.put(`${API_BASE_URL}/api/v1/users/profile`, data, {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+
+      Alert.alert("Başarılı", "Profil bilgileriniz başarıyla güncellendi.");
+      setIsClientEditModalVisible(false);
+      await refreshUserInfo();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Profil güncellenirken hata oluştu.");
+    } finally {
+      setIsSavingClientProfile(false);
+    }
+  };
+
+  // Diyetisyene çalışma talebi gönder
+  const handleSendConnectionRequest = async (dietitianId: number) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/connections/request/${dietitianId}`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Çalışma talebiniz başarıyla gönderildi. Diyetisyenin onaylaması bekleniyor.");
+      
+      const resMyReqs = await axios.get(`${API_BASE_URL}/api/v1/connections/my-requests`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setConnectionRequests(resMyReqs.data);
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Talep gönderilemedi.");
+    }
+  };
+
+  // Diyetisyen çalışma talebini kabul etsin
+  const handleApproveConnectionRequest = async (requestId: number) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/connections/requests/${requestId}/approve`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Çalışma talebi onaylandı. Danışan listenize eklendi.");
+      loadData();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Talep onaylanamadı.");
+    }
+  };
+
+  // Diyetisyen çalışma talebini reddetsin
+  const handleRejectConnectionRequest = async (requestId: number) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/connections/requests/${requestId}/reject`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Çalışma talebi reddedildi.");
+      loadData();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Talep reddedilemedi.");
+    }
+  };
+
   // Günlük log kaydet
   const handleSaveDailyLog = async () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -515,6 +846,108 @@ export default function HomeScreen() {
               <ThemedText style={styles.primaryActionBtnText}>➕ Yeni Danışan Kaydı Ekle</ThemedText>
             </TouchableOpacity>
 
+            <TouchableOpacity 
+              style={[styles.primaryActionBtn, { backgroundColor: '#FF9800', marginTop: 10 }]}
+              onPress={() => setIsBroadcastModalVisible(true)}
+            >
+              <ThemedText style={styles.primaryActionBtnText}>📢 Toplu Duyuru Gönder</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.secondaryActionBtn, { borderColor: theme.primary, borderWidth: 1 }]}
+              onPress={() => {
+                setEditName(userInfo?.name || '');
+                setEditNotes(userInfo?.notes || '');
+                setEditInstagram(userInfo?.instagramUrl || '');
+                setEditLinkedin(userInfo?.linkedinUrl || '');
+                setEditYoutube(userInfo?.youtubeUrl || '');
+                setEditProfilePicture(userInfo?.profilePictureUrl || '');
+                setIsEditProfileModalVisible(true);
+              }}
+            >
+              <ThemedText style={[styles.secondaryActionBtnText, { color: theme.primary }]}>⚙️ Diyetisyen Profilini Düzenle</ThemedText>
+            </TouchableOpacity>
+
+            {/* Danışan Çalışma Talepleri Paneli */}
+            {connectionRequests.length > 0 && (
+              <View style={[styles.requestsPanel, { backgroundColor: theme.backgroundElement }]}>
+                <ThemedText style={styles.requestsPanelTitle}>👥 Danışan Çalışma Talepleri ({connectionRequests.length})</ThemedText>
+                <Text style={styles.requestsPanelSubtitle}>Sizinle çalışmak isteyen yeni danışan talepleri:</Text>
+                
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 8, flexDirection: 'row' }}>
+                  {connectionRequests.map((req) => (
+                    <View key={req.id} style={[styles.requestCard, { backgroundColor: theme.backgroundSelected }]}>
+                      <Text style={styles.requestClientName}>{req.client.name}</Text>
+                      <Text style={styles.requestClientMeta}>
+                        Boy: {req.client.height || '-'} cm | Kilo: {req.client.currentWeight || '-'} kg
+                      </Text>
+                      <Text style={styles.requestClientCategory}>
+                        Kategori: {translateCategory(req.client.category || 'WEIGHT_MANAGEMENT')}
+                      </Text>
+                      
+                      <View style={styles.requestActionRow}>
+                        <TouchableOpacity 
+                          style={[styles.requestBtn, styles.approveRequestBtn]}
+                          onPress={() => handleApproveConnectionRequest(req.id)}
+                        >
+                          <Text style={styles.requestBtnText}>Kabul Et</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.requestBtn, styles.rejectRequestBtn]}
+                          onPress={() => handleRejectConnectionRequest(req.id)}
+                        >
+                          <Text style={styles.requestBtnText}>Reddet</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Diyetisyen Başvuruları Paneli */}
+            {isAdmin && (
+              <>
+                <ThemedText style={styles.sectionTitle}>📋 Diyetisyen Başvuruları ({applications.length})</ThemedText>
+                {applications.length > 0 ? (
+                  applications.map((app) => (
+                    <View key={app.id} style={[styles.appRequestCard, { backgroundColor: theme.backgroundElement }]}>
+                      <View style={styles.appCardHeader}>
+                        <ThemedText style={styles.appClientName}>{app.fullName}</ThemedText>
+                        <ThemedText style={styles.appApprovedTime}>{app.email}</ThemedText>
+                      </View>
+                      <ThemedText style={styles.appDateTime}>🎓 Okul: <ThemedText style={styles.boldText}>{app.university}</ThemedText> | Deneyim: <ThemedText style={styles.boldText}>{app.experienceYears} Yıl</ThemedText></ThemedText>
+                      <ThemedText style={styles.appDateTime}>📜 Diploma No: <ThemedText style={styles.boldText}>{app.diplomaNumber}</ThemedText></ThemedText>
+                      {app.documentUrl ? <ThemedText style={styles.appNote}>Belge/Link: {app.documentUrl}</ThemedText> : null}
+                      {app.note ? <ThemedText style={styles.appNote}>Ön Yazı: "{app.note}"</ThemedText> : null}
+                      
+                      <View style={styles.appActionRow}>
+                        <TouchableOpacity 
+                          style={[styles.appBtn, styles.appRejectBtn]}
+                          onPress={() => {
+                            setSelectedApplication(app);
+                            setIsRejectModalVisible(true);
+                          }}
+                        >
+                          <ThemedText style={styles.appRejectText}>Reddet</ThemedText>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.appBtn, { backgroundColor: theme.primary }]}
+                          onPress={() => handleApproveApplication(app.id)}
+                        >
+                          <ThemedText style={styles.appApproveText}>Onayla</ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <View style={[styles.noItemsCard, { backgroundColor: theme.backgroundElement }]}>
+                    <ThemedText style={styles.noItemsText}>🎉 Bekleyen diyetisyen başvurusu bulunmuyor.</ThemedText>
+                  </View>
+                )}
+              </>
+            )}
+
             {/* Bekleyen Randevu Talepleri */}
             <ThemedText style={styles.sectionTitle}>📅 Bekleyen Randevu Talepleri ({pendingAppointments.length})</ThemedText>
             {pendingAppointments.length > 0 ? (
@@ -578,10 +1011,18 @@ export default function HomeScreen() {
             {/* Kilo & BMI Kartı */}
             <View style={[styles.profileSummaryCard, { backgroundColor: theme.backgroundElement }]}>
               <View style={styles.badgeRow}>
-                <View style={[styles.categoryBadge, { backgroundColor: theme.backgroundSelected }]}>
-                  <ThemedText style={styles.categoryBadgeText}>
-                    {translateCategory(userInfo?.category || 'WEIGHT_MANAGEMENT')}
-                  </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.categoryBadge, { backgroundColor: theme.backgroundSelected }]}>
+                    <ThemedText style={styles.categoryBadgeText}>
+                      {translateCategory(userInfo?.category || 'WEIGHT_MANAGEMENT')}
+                    </ThemedText>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.editProfileSummaryBtn}
+                    onPress={openClientEditProfile}
+                  >
+                    <ThemedText style={styles.editProfileSummaryBtnText}>⚙️ Düzenle</ThemedText>
+                  </TouchableOpacity>
                 </View>
                 <ThemedText style={styles.heightText}>Boy: {userInfo?.height || 0} cm</ThemedText>
               </View>
@@ -856,14 +1297,103 @@ export default function HomeScreen() {
             )}
 
             {/* Diyetisyen Künyesi */}
-            <View style={[styles.dietitianCreditsCard, { backgroundColor: theme.backgroundElement }]}>
-              <ThemedText style={styles.creditsEmoji}>👩‍⚕️</ThemedText>
-              <View style={styles.creditsTextContainer}>
-                <ThemedText style={styles.creditsLabel}>Diyetisyeniniz</ThemedText>
-                <ThemedText style={styles.creditsName}>Şüheda Terat</ThemedText>
-                <ThemedText style={styles.creditsLocation}>İzmir / Alsancak Kliniği</ThemedText>
+            {userInfo?.dietitian ? (
+              <View style={[styles.dietitianCreditsCard, { backgroundColor: theme.backgroundElement }]}>
+                <View style={styles.creditsMainRow}>
+                  {userInfo.dietitian.profilePictureUrl ? (
+                    <Image 
+                      source={{ uri: userInfo.dietitian.profilePictureUrl }} 
+                      style={styles.creditsPhoto} 
+                    />
+                  ) : (
+                    <ThemedText style={styles.creditsEmoji}>👩‍⚕️</ThemedText>
+                  )}
+                  <View style={styles.creditsTextContainer}>
+                    <ThemedText style={styles.creditsLabel}>Diyetisyeniniz</ThemedText>
+                    <ThemedText style={styles.creditsName}>{userInfo.dietitian.name}</ThemedText>
+                    <ThemedText style={styles.creditsLocation}>{userInfo.dietitian.notes || "İzmir / Alsancak Kliniği"}</ThemedText>
+                  </View>
+                </View>
+
+                {/* Sosyal Medya Butonları */}
+                {(userInfo.dietitian.instagramUrl || userInfo.dietitian.linkedinUrl || userInfo.dietitian.youtubeUrl) ? (
+                  <View style={styles.socialRow}>
+                    {userInfo.dietitian.instagramUrl ? (
+                      <TouchableOpacity
+                        style={styles.socialIconContainer}
+                        onPress={() => Linking.openURL(userInfo.dietitian.instagramUrl)}
+                      >
+                        <View style={[styles.socialIconBg, styles.instagramBg]}>
+                          <Text style={styles.socialIconText}>📸</Text>
+                        </View>
+                        <Text style={styles.socialLabelText}>Instagram</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {userInfo.dietitian.linkedinUrl ? (
+                      <TouchableOpacity
+                        style={styles.socialIconContainer}
+                        onPress={() => Linking.openURL(userInfo.dietitian.linkedinUrl)}
+                      >
+                        <View style={[styles.socialIconBg, styles.linkedinBg]}>
+                          <Text style={styles.socialIconText}>💼</Text>
+                        </View>
+                        <Text style={styles.socialLabelText}>LinkedIn</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {userInfo.dietitian.youtubeUrl ? (
+                      <TouchableOpacity
+                        style={styles.socialIconContainer}
+                        onPress={() => Linking.openURL(userInfo.dietitian.youtubeUrl)}
+                      >
+                        <View style={[styles.socialIconBg, styles.youtubeBg]}>
+                          <Text style={styles.socialIconText}>🎥</Text>
+                        </View>
+                        <Text style={styles.socialLabelText}>YouTube</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Diyetisyen Değiştir & Sohbet Butonları */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                  <TouchableOpacity 
+                    style={[styles.findDietitianCardBtn, { borderColor: theme.primary, borderWidth: 1, flex: 1 }]}
+                    onPress={() => {
+                      loadDietDataForFinder();
+                      setIsFindDietitianModalVisible(true);
+                    }}
+                  >
+                    <Text style={[styles.findDietitianCardBtnText, { color: theme.primary, fontWeight: 'bold', textAlign: 'center' }]}>🔄 Diyetisyeni Değiştir</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.findDietitianCardBtn, { backgroundColor: theme.primary, flex: 1 }]}
+                    onPress={() => {
+                      setChatWithUser(userInfo.dietitian);
+                      setIsChatModalVisible(true);
+                    }}
+                  >
+                    <Text style={[styles.findDietitianCardBtnText, { color: '#FFFFFF', fontWeight: 'bold', textAlign: 'center' }]}>💬 Sohbet Et</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={[styles.noDietitianCard, { backgroundColor: theme.backgroundElement }]}>
+                <Text style={styles.noDietitianTitle}>👩‍⚕️ Diyetisyeniniz Bulunmuyor</Text>
+                <Text style={styles.noDietitianDesc}>Diyet programı alabilmek ve randevu planlayabilmek için sistemdeki diyetisyenlerden birine çalışma talebi göndermelisiniz.</Text>
+                <TouchableOpacity 
+                  style={[styles.primaryActionBtn, { backgroundColor: theme.primary, width: '100%', marginTop: 8 }]}
+                  onPress={() => {
+                    loadDietDataForFinder();
+                    setIsFindDietitianModalVisible(true);
+                  }}
+                >
+                  <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF' }]}>🔍 Diyetisyen Bul & İstek Gönder</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
           </View>
         )}
@@ -1167,6 +1697,615 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* DİYETİSYEN BAŞVURU RED DETAY MODALI */}
+      <Modal
+        visible={isRejectModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsRejectModalVisible(false)}
+      >
+        <View style={styles.notifModalOverlay}>
+          <View style={[styles.notifModalContent, { backgroundColor: theme.background, maxHeight: 320 }]}>
+            <View style={styles.notifModalHeader}>
+              <ThemedText type="subtitle" style={styles.notifModalTitle}>❌ Başvuru Red Nedeni</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsRejectModalVisible(false)}>
+                <Text style={styles.notifCloseBtnText}>İptal</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 16, gap: 12 }}>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: theme.backgroundSelected,
+                  color: theme.text,
+                  height: 100,
+                  padding: 10,
+                  borderRadius: 8,
+                  textAlignVertical: 'top',
+                  backgroundColor: theme.backgroundElement
+                }}
+                placeholder="Lütfen red gerekçesini yazınız..."
+                placeholderTextColor={theme.textSecondary}
+                multiline={true}
+                numberOfLines={4}
+                value={rejectionReason}
+                onChangeText={setRejectionReason}
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: '#D32F2F', marginTop: 12, height: 44 }]}
+                onPress={handleRejectApplication}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Başvuruyu Reddet</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DİYETİSYEN PROFİL DÜZENLEME MODALI */}
+      <Modal
+        visible={isEditProfileModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsEditProfileModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">⚙️ Diyetisyen Profilini Düzenle</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsEditProfileModalVisible(false)}>
+                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Ad Soyad *</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="Örn: Şüheda Terat"
+                  placeholderTextColor={theme.textSecondary}
+                  value={editName}
+                  onChangeText={setEditName}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Klinik / Adres / Biyografi</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="Örn: İzmir / Alsancak Kliniği"
+                  placeholderTextColor={theme.textSecondary}
+                  value={editNotes}
+                  onChangeText={setEditNotes}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Instagram Profil Linki</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="https://instagram.com/kullaniciadi"
+                  placeholderTextColor={theme.textSecondary}
+                  autoCapitalize="none"
+                  value={editInstagram}
+                  onChangeText={setEditInstagram}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>LinkedIn Profil Linki</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="https://linkedin.com/in/kullaniciadi"
+                  placeholderTextColor={theme.textSecondary}
+                  autoCapitalize="none"
+                  value={editLinkedin}
+                  onChangeText={setEditLinkedin}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>YouTube Profil Linki</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="https://youtube.com/@kanaladi"
+                  placeholderTextColor={theme.textSecondary}
+                  autoCapitalize="none"
+                  value={editYoutube}
+                  onChangeText={setEditYoutube}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Profil Fotoğrafı Linki</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="https://example.com/resim.jpg"
+                  placeholderTextColor={theme.textSecondary}
+                  autoCapitalize="none"
+                  value={editProfilePicture}
+                  onChangeText={setEditProfilePicture}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setIsEditProfileModalVisible(false)}
+                disabled={isSavingProfile}
+              >
+                <Text style={styles.cancelBtnText}>İptal</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                onPress={handleSaveProfile}
+                disabled={isSavingProfile}
+              >
+                {isSavingProfile ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Kaydet</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DANIŞAN PROFİL DÜZENLEME MODALI */}
+      <Modal
+        visible={isClientEditModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsClientEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">⚙️ Profilimi Düzenle</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsClientEditModalVisible(false)}>
+                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Ad Soyad *</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="Adınız Soyadınız"
+                  placeholderTextColor={theme.textSecondary}
+                  value={clientEditName}
+                  onChangeText={setClientEditName}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Boy (cm) *</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="Örn: 165"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="numeric"
+                  value={clientEditHeight}
+                  onChangeText={setClientEditHeight}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Mevcut Kilo (kg) *</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="Örn: 75.5"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="numeric"
+                  value={clientEditCurrentWeight}
+                  onChangeText={setClientEditCurrentWeight}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Hedef Kilo (kg) *</Text>
+                <TextInput
+                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  placeholder="Örn: 65.0"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="numeric"
+                  value={clientEditTargetWeight}
+                  onChangeText={setClientEditTargetWeight}
+                />
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Takip Programı Kategorisi *</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6 }}>
+                  {[
+                    { id: 'WEIGHT_MANAGEMENT', label: 'Kilo' },
+                    { id: 'GLP_1', label: 'GLP-1' },
+                    { id: 'LIPEDEMA', label: 'Lipödem' },
+                    { id: 'HORMONAL_BALANCE', label: 'Hormon' }
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={{
+                        width: '47%',
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.primary,
+                        alignItems: 'center',
+                        backgroundColor: clientEditCategory === item.id ? theme.primary : 'transparent'
+                      }}
+                      onPress={() => setClientEditCategory(item.id as any)}
+                    >
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        color: clientEditCategory === item.id ? '#FFFFFF' : theme.primary
+                      }}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {clientEditCategory === 'GLP_1' && (
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEEEE' }}>
+                  <Text style={[styles.modalLabel, { color: theme.primary, fontWeight: 'bold' }]}>💉 GLP-1 Takip Detayları</Text>
+                  
+                  <View style={styles.modalInputGroup}>
+                    <Text style={styles.modalLabel}>Enjeksiyon Günü</Text>
+                    <TextInput
+                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      placeholder="Pazartesi"
+                      placeholderTextColor={theme.textSecondary}
+                      value={clientEditGlp1Day}
+                      onChangeText={setClientEditGlp1Day}
+                    />
+                  </View>
+
+                  <View style={styles.modalInputGroup}>
+                    <Text style={styles.modalLabel}>Dozaj</Text>
+                    <TextInput
+                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      placeholder="0.25 mg"
+                      placeholderTextColor={theme.textSecondary}
+                      value={clientEditGlp1Dosage}
+                      onChangeText={setClientEditGlp1Dosage}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {clientEditCategory === 'LIPEDEMA' && (
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEEEE' }}>
+                  <Text style={[styles.modalLabel, { color: theme.primary, fontWeight: 'bold' }]}>🦵 Lipödem Takip Detayları</Text>
+                  
+                  <View style={styles.modalInputGroup}>
+                    <Text style={styles.modalLabel}>Lipödem Evresi (1-2-3-4)</Text>
+                    <TextInput
+                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      placeholder="Örn: 2"
+                      placeholderTextColor={theme.textSecondary}
+                      keyboardType="numeric"
+                      value={clientEditLipedemaStage}
+                      onChangeText={setClientEditLipedemaStage}
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10 }}>
+                    <Text style={styles.modalLabel}>Anti-inflamatuar Diyet</Text>
+                    <TouchableOpacity
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: clientEditAntiInflammatory ? theme.primary : '#B0BEC5'
+                      }}
+                      onPress={() => setClientEditAntiInflammatory(!clientEditAntiInflammatory)}
+                    >
+                      <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 }}>
+                        {clientEditAntiInflammatory ? "UYUMLU" : "UYUMSUZ"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {clientEditCategory === 'HORMONAL_BALANCE' && (
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEEEE' }}>
+                  <Text style={[styles.modalLabel, { color: theme.primary, fontWeight: 'bold' }]}>🧬 Hormonal Denge Detayları</Text>
+                  
+                  <View style={styles.modalInputGroup}>
+                    <Text style={styles.modalLabel}>Hedef Döngü / Faz</Text>
+                    <TextInput
+                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      placeholder="Foliküler Faz"
+                      placeholderTextColor={theme.textSecondary}
+                      value={clientEditHormoneCycle}
+                      onChangeText={setClientEditHormoneCycle}
+                    />
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setIsClientEditModalVisible(false)}
+                disabled={isSavingClientProfile}
+              >
+                <Text style={styles.cancelBtnText}>İptal</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                onPress={handleSaveClientProfile}
+                disabled={isSavingClientProfile}
+              >
+                {isSavingClientProfile ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Kaydet</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DİYETİSYEN BUL VE İSTEK GÖNDER MODALI */}
+      <Modal
+        visible={isFindDietitianModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsFindDietitianModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">🔍 Diyetisyen Bul & İstek Gönder</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsFindDietitianModalVisible(false)}>
+                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingDietitians ? (
+              <ActivityIndicator color={theme.primary} size="large" style={{ marginVertical: 30 }} />
+            ) : (
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                {dietitians.length === 0 ? (
+                  <Text style={styles.noItemsText}>Sistemde henüz kayıtlı diyetisyen bulunmuyor.</Text>
+                ) : (
+                  dietitians.map((dietitian) => {
+                    const isMyDietitian = userInfo?.dietitian?.id === dietitian.id;
+                    const request = connectionRequests.find(r => r.dietitian.id === dietitian.id && r.status === 'PENDING');
+                    const isPending = !!request;
+
+                    return (
+                      <View key={dietitian.id} style={[styles.dietitianListCard, { backgroundColor: theme.backgroundElement }]}>
+                        <View style={styles.dietitianListHeader}>
+                          {dietitian.profilePictureUrl ? (
+                            <Image 
+                              source={{ uri: dietitian.profilePictureUrl }} 
+                              style={styles.dietitianListPhoto} 
+                            />
+                          ) : (
+                            <View style={[styles.dietitianListPhoto, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E0E0E0' }]}>
+                              <Text style={{ fontSize: 20 }}>👩‍⚕️</Text>
+                            </View>
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.dietitianListName}>{dietitian.name}</Text>
+                            <Text style={styles.dietitianListNotes}>{dietitian.notes || "Diyetisyen"}</Text>
+                          </View>
+                        </View>
+
+                        {/* Sosyal Medya İkonları */}
+                        {(dietitian.instagramUrl || dietitian.linkedinUrl || dietitian.youtubeUrl) ? (
+                          <View style={[styles.socialRow, { borderTopWidth: 0, paddingTop: 4, paddingBottom: 8 }]}>
+                            {dietitian.instagramUrl ? (
+                              <TouchableOpacity onPress={() => Linking.openURL(dietitian.instagramUrl)} style={styles.socialIconContainer}>
+                                <View style={[styles.socialIconBg, styles.instagramBg, { width: 24, height: 24, borderRadius: 12 }]}>
+                                  <Text style={[styles.socialIconText, { fontSize: 11 }]}>📸</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ) : null}
+                            {dietitian.linkedinUrl ? (
+                              <TouchableOpacity onPress={() => Linking.openURL(dietitian.linkedinUrl)} style={styles.socialIconContainer}>
+                                <View style={[styles.socialIconBg, styles.linkedinBg, { width: 24, height: 24, borderRadius: 12 }]}>
+                                  <Text style={[styles.socialIconText, { fontSize: 11 }]}>💼</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ) : null}
+                            {dietitian.youtubeUrl ? (
+                              <TouchableOpacity onPress={() => Linking.openURL(dietitian.youtubeUrl)} style={styles.socialIconContainer}>
+                                <View style={[styles.socialIconBg, styles.youtubeBg, { width: 24, height: 24, borderRadius: 12 }]}>
+                                  <Text style={[styles.socialIconText, { fontSize: 11 }]}>🎥</Text>
+                                </View>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        ) : null}
+
+                        <View style={{ marginTop: 8 }}>
+                          {isMyDietitian ? (
+                            <View style={[styles.statusBanner, { backgroundColor: '#E8F5E9' }]}>
+                              <Text style={{ color: '#2E7D32', fontWeight: 'bold', fontSize: 12 }}>✔️ ŞU ANKİ DİYETİSYENİNİZ</Text>
+                            </View>
+                          ) : isPending ? (
+                            <View style={[styles.statusBanner, { backgroundColor: '#FFF3E0' }]}>
+                              <Text style={{ color: '#EF6C00', fontWeight: 'bold', fontSize: 12 }}>⏳ TALEP GÖNDERİLDİ (BEKLEMEDE)</Text>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              style={[styles.primaryActionBtn, { backgroundColor: theme.primary, height: 36, marginTop: 4 }]}
+                              onPress={() => handleSendConnectionRequest(dietitian.id)}
+                            >
+                              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>➕ Çalışma Talebi Gönder</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* SOHBET (CHAT) MODALI */}
+      <Modal
+        visible={isChatModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setIsChatModalVisible(false);
+          setChatWithUser(null);
+          setChatMessages([]);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, height: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">💬 {chatWithUser?.name || "Sohbet"}</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => {
+                setIsChatModalVisible(false);
+                setChatWithUser(null);
+                setChatMessages([]);
+              }}>
+                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={{ flex: 1, padding: 12 }} 
+              contentContainerStyle={{ gap: 10, paddingBottom: 20 }}
+              ref={(ref) => ref?.scrollToEnd({ animated: true })}
+            >
+              {chatMessages.length === 0 ? (
+                <Text style={styles.noItemsText}>Sohbet geçmişi bulunmuyor. İlk mesajı siz yazın!</Text>
+              ) : (
+                chatMessages.map((msg) => {
+                  const isMe = msg.sender.id === userInfo?.id;
+                  if (msg.isBroadcast) {
+                    return (
+                      <View key={msg.id} style={[styles.chatMsgRow, { justifyContent: 'flex-start' }]}>
+                        <View style={styles.broadcastBubble}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14 }}>📢</Text>
+                            <Text style={styles.broadcastTitle}>Toplu Duyuru</Text>
+                          </View>
+                          <Text style={styles.broadcastContent}>{msg.content}</Text>
+                          <Text style={styles.broadcastFooter}>⚠️ Bu bir duyurudur, doğrudan yanıtlanamaz.</Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View key={msg.id} style={[styles.chatMsgRow, { justifyContent: isMe ? 'flex-end' : 'flex-start' }]}>
+                      <View style={[
+                        styles.chatBubble, 
+                        isMe ? [styles.myBubble, { backgroundColor: theme.primary }] : [styles.otherBubble, { backgroundColor: theme.backgroundSelected }]
+                      ]}>
+                        <Text style={[styles.chatText, isMe ? { color: '#FFFFFF' } : { color: theme.text }]}>
+                          {msg.content}
+                        </Text>
+                        <Text style={[styles.chatTime, isMe ? { color: 'rgba(255, 255, 255, 0.7)' } : { color: theme.textSecondary }]}>
+                          {new Date(msg.sentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={[styles.chatInputRow, { borderTopColor: theme.backgroundSelected }]}>
+              <TextInput
+                style={[styles.chatInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
+                placeholder="Mesajınızı yazın..."
+                placeholderTextColor={theme.textSecondary}
+                value={typedMessage}
+                onChangeText={setTypedMessage}
+              />
+              <TouchableOpacity 
+                style={[styles.chatSendBtn, { backgroundColor: theme.primary }]}
+                onPress={handleSendChatMessage}
+                disabled={isSendingMessage}
+              >
+                {isSendingMessage ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.chatSendBtnText}>Gönder</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DİYETİSYEN TOPLU DUYURU MODALI */}
+      <Modal
+        visible={isBroadcastModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsBroadcastModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: 320 }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">📢 Toplu Duyuru Gönder</ThemedText>
+              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsBroadcastModalVisible(false)}>
+                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 16, gap: 12 }}>
+              <Text style={{ fontSize: 13, color: theme.textSecondary }}>Bu mesaj, size bağlı olan TÜM danışanlarınıza toplu bildirim ve duyuru olarak iletilecektir.</Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: theme.backgroundSelected,
+                  color: theme.text,
+                  height: 100,
+                  padding: 10,
+                  borderRadius: 8,
+                  textAlignVertical: 'top',
+                  backgroundColor: theme.backgroundElement
+                }}
+                placeholder="Duyuru içeriğini buraya yazınız..."
+                placeholderTextColor={theme.textSecondary}
+                multiline={true}
+                numberOfLines={4}
+                value={broadcastText}
+                onChangeText={setBroadcastText}
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { backgroundColor: '#FF9800', marginTop: 12, height: 44 }]}
+                onPress={handleSendBroadcast}
+                disabled={isSendingBroadcast}
+              >
+                {isSendingBroadcast ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>📢 Tüm Danışanlara Duyur</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -1285,6 +2424,19 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: {
     fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  editProfileSummaryBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#C5DFCC',
+  },
+  editProfileSummaryBtnText: {
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#2E7D32',
   },
@@ -1883,5 +3035,310 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999999',
     textAlign: 'right',
+  },
+  secondaryActionBtn: {
+    height: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    backgroundColor: 'transparent',
+  },
+  secondaryActionBtnText: {
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  dietitianCreditsCard: {
+    padding: Spacing.four,
+    borderRadius: 16,
+    gap: Spacing.three,
+    marginTop: Spacing.three,
+  },
+  creditsMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  creditsEmoji: {
+    fontSize: 32,
+  },
+  creditsTextContainer: {
+    flex: 1,
+  },
+  creditsLabel: {
+    fontSize: 11,
+    color: '#81A588',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  creditsName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1C3A24',
+  },
+  creditsLocation: {
+    fontSize: 13,
+    color: '#546E5A',
+  },
+  creditsPhoto: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E0E0E0',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingTop: Spacing.three,
+    borderTopWidth: 1,
+    borderTopColor: '#E1EFE4',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  socialIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  socialIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  instagramBg: {
+    backgroundColor: '#E1306C',
+  },
+  linkedinBg: {
+    backgroundColor: '#0077B5',
+  },
+  youtubeBg: {
+    backgroundColor: '#FF0000',
+  },
+  socialIconText: {
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  socialLabelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#546E5A',
+  },
+  // Diyetisyen Bulma ve Çalışma Talebi Styles
+  noDietitianCard: {
+    padding: Spacing.four,
+    borderRadius: 18,
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginTop: Spacing.three,
+    borderWidth: 1.5,
+    borderColor: '#C5DFCC',
+    borderStyle: 'dashed',
+  },
+  noDietitianTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  noDietitianDesc: {
+    fontSize: 13,
+    color: '#546E5A',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginVertical: 4,
+  },
+  findDietitianCardBtn: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  findDietitianCardBtnText: {
+    fontSize: 14,
+  },
+  dietitianListCard: {
+    padding: Spacing.three,
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E1EFE4',
+  },
+  dietitianListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  dietitianListPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  dietitianListName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1C3A24',
+  },
+  dietitianListNotes: {
+    fontSize: 12,
+    color: '#546E5A',
+  },
+  statusBanner: {
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Diyetisyen Çalışma Talepleri Paneli Styles
+  requestsPanel: {
+    padding: Spacing.four,
+    borderRadius: 18,
+    marginTop: Spacing.three,
+    gap: Spacing.two,
+  },
+  requestsPanelTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  requestsPanelSubtitle: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  requestCard: {
+    width: 180,
+    padding: 12,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#C5DFCC',
+  },
+  requestClientName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1C3A24',
+  },
+  requestClientMeta: {
+    fontSize: 11,
+    color: '#546E5A',
+  },
+  requestClientCategory: {
+    fontSize: 11,
+    color: '#2E7D32',
+    fontWeight: 'bold',
+  },
+  requestActionRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  requestBtn: {
+    flex: 1,
+    height: 28,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approveRequestBtn: {
+    backgroundColor: '#2E7D32',
+  },
+  rejectRequestBtn: {
+    backgroundColor: '#D32F2F',
+  },
+  requestBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  // Chat Styles
+  chatMsgRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginVertical: 4,
+  },
+  chatBubble: {
+    maxWidth: '75%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 4,
+  },
+  myBubble: {
+    borderBottomRightRadius: 2,
+  },
+  otherBubble: {
+    borderBottomLeftRadius: 2,
+  },
+  chatText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  chatTime: {
+    fontSize: 10,
+    alignSelf: 'flex-end',
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    padding: 12,
+    borderTopWidth: 1,
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  chatInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    fontSize: 14,
+  },
+  chatSendBtn: {
+    width: 70,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatSendBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  // Broadcast announcement bubble
+  broadcastBubble: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FFE0B2',
+    borderWidth: 1,
+    borderBottomLeftRadius: 2,
+    width: '90%',
+    maxWidth: '90%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 4,
+  },
+  broadcastTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#E65100',
+  },
+  broadcastContent: {
+    fontSize: 14,
+    color: '#4E342E',
+    lineHeight: 20,
+  },
+  broadcastFooter: {
+    fontSize: 10,
+    color: '#E65100',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
 });

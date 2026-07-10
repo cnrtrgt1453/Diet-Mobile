@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal } from 'react-native';
+import { StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 
@@ -46,6 +46,102 @@ export default function ExploreScreen() {
   // Danışan Modu (ROLE_USER) State'leri
   const [myMeasurements, setMyMeasurements] = useState<any[]>([]);
   const [myDiets, setMyDiets] = useState<any[]>([]);
+  const [myDailyLogs, setMyDailyLogs] = useState<any[]>([]);
+  const [activeChartTab, setActiveChartTab] = useState<'WEIGHT' | 'FAT' | 'WATER'>('WEIGHT');
+  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+
+  // Sohbet (Chat) State'leri
+  const [isChatModalVisible, setIsChatModalVisible] = useState(false);
+  const [chatWithUser, setChatWithUser] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [typedMessage, setTypedMessage] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  const fetchChatHistory = useCallback(async () => {
+    if (!userToken || !chatWithUser) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/messages/history/${chatWithUser.id}`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setChatMessages(res.data);
+    } catch (e) {
+      console.error("Failed to load chat history:", e);
+    }
+  }, [userToken, chatWithUser]);
+
+  useEffect(() => {
+    if (!isChatModalVisible || !chatWithUser) return;
+    fetchChatHistory();
+    const interval = setInterval(fetchChatHistory, 4000);
+    return () => clearInterval(interval);
+  }, [isChatModalVisible, chatWithUser, fetchChatHistory]);
+
+  const handleSendChatMessage = async () => {
+    if (!typedMessage.trim() || !chatWithUser) return;
+    setIsSendingMessage(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/messages/send/${chatWithUser.id}`, {
+        content: typedMessage.trim()
+      }, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setTypedMessage('');
+      fetchChatHistory();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "Mesaj gönderilemedi.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  // Grafik için veri hazırlama
+  const getChartData = () => {
+    if (activeChartTab === 'WEIGHT') {
+      return [...myMeasurements]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(m => ({
+          date: m.date,
+          value: m.weight,
+          label: m.weight + ' kg',
+          note: m.note,
+          details: `Kas: ${m.muscleMass || '-'} kg | Yağ: %${m.bodyFat || '-'}`
+        }));
+    } else if (activeChartTab === 'FAT') {
+      return [...myMeasurements]
+        .filter(m => m.bodyFat !== null && m.bodyFat !== undefined)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(m => ({
+          date: m.date,
+          value: m.bodyFat,
+          label: '%' + m.bodyFat,
+          note: m.note,
+          details: `Ağırlık: ${m.weight} kg | Kas: ${m.muscleMass || '-'} kg`
+        }));
+    } else {
+      return [...myDailyLogs]
+        .filter(l => l.waterIntakeMl !== null && l.waterIntakeMl !== undefined)
+        .sort((a, b) => new Date(a.logDate).getTime() - new Date(b.logDate).getTime())
+        .map(l => ({
+          date: l.logDate,
+          value: l.waterIntakeMl / 1000, // mL -> Litre
+          label: (l.waterIntakeMl / 1000).toFixed(1) + ' L',
+          note: l.glp1SideEffects || l.currentHormonalPhase ? `Faz: ${l.currentHormonalPhase || '-'} | Yan Etki: ${l.glp1SideEffects || 'Yok'}` : null,
+          details: `Su Tüketimi: ${l.waterIntakeMl} mL`
+        }));
+    }
+  };
+
+  const chartData = getChartData();
+  const chartValues = chartData.map(d => d.value);
+  const maxVal = chartValues.length > 0 ? Math.max(...chartValues) : 0;
+  const minVal = chartValues.length > 0 ? Math.min(...chartValues) : 0;
+  const midVal = (maxVal + minVal) / 2;
+
+  const selectedItem = selectedPointIndex !== null && selectedPointIndex < chartData.length 
+    ? chartData[selectedPointIndex] 
+    : chartData.length > 0 ? chartData[chartData.length - 1] : null;
+
+  const trendVal = chartData.length > 1 ? chartData[chartData.length - 1].value - chartData[0].value : 0;
 
   const isDietitian = userInfo?.role === 'ROLE_DIETITIAN';
 
@@ -69,6 +165,11 @@ export default function ExploreScreen() {
           headers: { Authorization: `Bearer ${userToken}` }
         });
         setMyDiets(resDiets.data);
+
+        const resLogs = await axios.get(`${API_BASE_URL}/api/v1/logs/daily/my`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        setMyDailyLogs(resLogs.data);
       }
     } catch (e: any) {
       console.error("Explore load error:", e.message);
@@ -257,25 +358,36 @@ export default function ExploreScreen() {
             <View style={styles.clientListWrapper}>
               {filteredClients.length > 0 ? (
                 filteredClients.map((client) => (
-                  <TouchableOpacity
-                    key={client.id}
-                    style={[styles.clientCard, { backgroundColor: theme.backgroundElement }]}
-                    onPress={() => handleSelectClient(client)}
-                  >
-                    <View style={styles.clientCardInfo}>
-                      <ThemedText style={styles.clientName}>{client.name}</ThemedText>
-                      <ThemedText style={styles.clientEmail}>{client.email}</ThemedText>
-                    </View>
-                    
-                    <View style={styles.clientCardBadgeCol}>
-                      <View style={[styles.catBadge, { backgroundColor: theme.backgroundSelected }]}>
-                        <ThemedText style={styles.catBadgeText}>{translateCategory(client.category)}</ThemedText>
+                  <View key={client.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.clientCard, { backgroundColor: theme.backgroundElement, flex: 1, marginBottom: 0 }]}
+                      onPress={() => handleSelectClient(client)}
+                    >
+                      <View style={styles.clientCardInfo}>
+                        <ThemedText style={styles.clientName}>{client.name}</ThemedText>
+                        <ThemedText style={styles.clientEmail}>{client.email}</ThemedText>
                       </View>
-                      <ThemedText style={styles.clientWeightText}>
-                        {client.currentWeight ? `${client.currentWeight} kg` : "Ölçüm yok"}
-                      </ThemedText>
-                    </View>
-                  </TouchableOpacity>
+                      
+                      <View style={styles.clientCardBadgeCol}>
+                        <View style={[styles.catBadge, { backgroundColor: theme.backgroundSelected }]}>
+                          <ThemedText style={styles.catBadgeText}>{translateCategory(client.category)}</ThemedText>
+                        </View>
+                        <ThemedText style={styles.clientWeightText}>
+                          {client.currentWeight ? `${client.currentWeight} kg` : "Ölçüm yok"}
+                        </ThemedText>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.clientChatBtn, { backgroundColor: theme.primary }]}
+                      onPress={() => {
+                        setChatWithUser(client);
+                        setIsChatModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.clientChatBtnText}>💬</Text>
+                    </TouchableOpacity>
+                  </View>
                 ))
               ) : (
                 <ThemedText style={styles.noResultsText}>Danışan bulunamadı.</ThemedText>
@@ -289,8 +401,117 @@ export default function ExploreScreen() {
           <View style={styles.section}>
             <ThemedText type="subtitle" style={[styles.pageTitle, { color: theme.text }]}>Takip Geçmişiniz</ThemedText>
 
-            {/* Ölçüm Geçmişi */}
-            <ThemedText style={styles.subSectionTitle}>📈 Ağırlık Takip Geçmişi</ThemedText>
+            {/* Etkileşimli Grafikler */}
+            <ThemedText style={styles.subSectionTitle}>📊 İlerleme Grafikleriniz</ThemedText>
+            
+            {/* Sekme Seçici */}
+            <View style={styles.chartSelectorContainer}>
+              <TouchableOpacity
+                style={[styles.chartSelectorTab, activeChartTab === 'WEIGHT' && styles.chartSelectorTabActive]}
+                onPress={() => { setActiveChartTab('WEIGHT'); setSelectedPointIndex(null); }}
+              >
+                <Text style={[styles.chartSelectorText, activeChartTab === 'WEIGHT' && styles.chartSelectorTextActive]}>⚖️ Ağırlık</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chartSelectorTab, activeChartTab === 'FAT' && styles.chartSelectorTabActive]}
+                onPress={() => { setActiveChartTab('FAT'); setSelectedPointIndex(null); }}
+              >
+                <Text style={[styles.chartSelectorText, activeChartTab === 'FAT' && styles.chartSelectorTextActive]}>🔥 Yağ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chartSelectorTab, activeChartTab === 'WATER' && styles.chartSelectorTabActive]}
+                onPress={() => { setActiveChartTab('WATER'); setSelectedPointIndex(null); }}
+              >
+                <Text style={[styles.chartSelectorText, activeChartTab === 'WATER' && styles.chartSelectorTextActive]}>💧 Su</Text>
+              </TouchableOpacity>
+            </View>
+
+            {chartData.length > 0 ? (
+              <View style={[styles.chartCard, { backgroundColor: theme.backgroundElement }]}>
+                {/* Değer gösterge başlığı */}
+                <View style={styles.chartHeaderRow}>
+                  <View>
+                    <Text style={[styles.chartHeaderSubtitle, { color: theme.textSecondary }]}>
+                      {selectedItem ? `${selectedItem.date} Kaydı` : 'Son Değer'}
+                    </Text>
+                    <Text style={[styles.chartHeaderTitle, { color: theme.text }]}>
+                      {selectedItem ? selectedItem.label : chartData[chartData.length - 1].label}
+                    </Text>
+                  </View>
+                  <View style={styles.trendContainer}>
+                    {trendVal !== 0 && (
+                      <View style={[styles.trendBadge, { backgroundColor: trendVal < 0 ? '#E8F5E9' : '#FFEBEE' }]}>
+                        <Text style={{ color: trendVal < 0 ? '#2E7D32' : '#C62828', fontWeight: 'bold', fontSize: 11 }}>
+                          {trendVal < 0 ? '↓' : '↑'} {Math.abs(trendVal).toFixed(1)} {activeChartTab === 'WATER' ? 'L' : activeChartTab === 'FAT' ? '%' : 'kg'}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={[styles.trendLabel, { color: theme.textSecondary }]}>genel değişim</Text>
+                  </View>
+                </View>
+
+                {/* Grafik Alanı */}
+                <View style={styles.chartContentContainer}>
+                  {/* Y Ekseni Etiketleri */}
+                  <View style={styles.yAxisLabels}>
+                    <Text style={[styles.yAxisText, { color: theme.textSecondary }]}>{maxVal.toFixed(1)}</Text>
+                    <Text style={[styles.yAxisText, { color: theme.textSecondary }]}>{midVal.toFixed(1)}</Text>
+                    <Text style={[styles.yAxisText, { color: theme.textSecondary }]}>{minVal.toFixed(1)}</Text>
+                  </View>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartScrollContent}>
+                    <View style={styles.chartBarsRow}>
+                      {chartData.map((point, index) => {
+                        const isSelected = selectedPointIndex === index || (selectedPointIndex === null && index === chartData.length - 1);
+                        const heightPct = maxVal === minVal ? 50 : ((point.value - minVal) / (maxVal - minVal)) * 70 + 20;
+
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.chartBarCol}
+                            onPress={() => setSelectedPointIndex(index)}
+                          >
+                            <View style={styles.barTrack}>
+                              <View 
+                                style={[
+                                  styles.barFill, 
+                                  { 
+                                    height: `${heightPct}%`,
+                                    backgroundColor: isSelected ? theme.primary : '#A5D6A7'
+                                  }
+                                ]} 
+                              />
+                            </View>
+                            <Text style={[styles.barDateText, { color: theme.textSecondary }, isSelected && [styles.barDateTextActive, { color: theme.primary }]]}>
+                              {point.date.substring(5).replace('-', '/')}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+
+                {/* Seçili noktanın detayları ve notu */}
+                {selectedItem && (selectedItem.details || selectedItem.note) && (
+                  <View style={[styles.chartDetailBox, { borderTopColor: theme.backgroundSelected }]}>
+                    {selectedItem.details && (
+                      <Text style={[styles.chartDetailText, { color: theme.text }]}>{selectedItem.details}</Text>
+                    )}
+                    {selectedItem.note && (
+                      <Text style={[styles.chartNoteText, { color: theme.textSecondary }]}>💡 Not: "{selectedItem.note}"</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={[styles.emptyChartCard, { backgroundColor: theme.backgroundElement }]}>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Grafik için henüz yeterli veri bulunmuyor.</Text>
+              </View>
+            )}
+
+            {/* Listelenmiş Ölçüm Geçmişi */}
+            <ThemedText style={styles.subSectionTitle}>📋 Ölçüm Kayıt Defteri</ThemedText>
             {myMeasurements.length > 0 ? (
               <View style={styles.historyList}>
                 {myMeasurements.map((m) => (
@@ -635,6 +856,98 @@ export default function ExploreScreen() {
 
             <View style={{ height: 60 }} />
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* SOHBET (CHAT) MODALI */}
+      <Modal
+        visible={isChatModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setIsChatModalVisible(false);
+          setChatWithUser(null);
+          setChatMessages([]);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, height: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">💬 {chatWithUser?.name || "Sohbet"}</ThemedText>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => {
+                setIsChatModalVisible(false);
+                setChatWithUser(null);
+                setChatMessages([]);
+              }}>
+                <ThemedText style={styles.modalCloseBtnText}>Kapat</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={{ flex: 1, padding: 12 }} 
+              contentContainerStyle={{ gap: 10, paddingBottom: 20 }}
+              ref={(ref) => ref?.scrollToEnd({ animated: true })}
+            >
+              {chatMessages.length === 0 ? (
+                <Text style={styles.noResultsText}>Sohbet geçmişi bulunmuyor. İlk mesajı siz yazın!</Text>
+              ) : (
+                chatMessages.map((msg) => {
+                  const isMe = msg.sender.id === userInfo?.id;
+                  if (msg.isBroadcast) {
+                    return (
+                      <View key={msg.id} style={[styles.chatMsgRow, { justifyContent: 'flex-start' }]}>
+                        <View style={styles.broadcastBubble}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14 }}>📢</Text>
+                            <Text style={styles.broadcastTitle}>Toplu Duyuru</Text>
+                          </View>
+                          <Text style={styles.broadcastContent}>{msg.content}</Text>
+                          <Text style={styles.broadcastFooter}>⚠️ Bu bir duyurudur, doğrudan yanıtlanamaz.</Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View key={msg.id} style={[styles.chatMsgRow, { justifyContent: isMe ? 'flex-end' : 'flex-start' }]}>
+                      <View style={[
+                        styles.chatBubble, 
+                        isMe ? [styles.myBubble, { backgroundColor: theme.primary }] : [styles.otherBubble, { backgroundColor: theme.backgroundSelected }]
+                      ]}>
+                        <Text style={[styles.chatText, isMe ? { color: '#FFFFFF' } : { color: theme.text }]}>
+                          {msg.content}
+                        </Text>
+                        <Text style={[styles.chatTime, isMe ? { color: 'rgba(255, 255, 255, 0.7)' } : { color: theme.textSecondary }]}>
+                          {new Date(msg.sentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={[styles.chatInputRow, { borderTopColor: theme.backgroundSelected }]}>
+              <TextInput
+                style={[styles.chatInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
+                placeholder="Mesajınızı yazın..."
+                placeholderTextColor={theme.textSecondary}
+                value={typedMessage}
+                onChangeText={setTypedMessage}
+              />
+              <TouchableOpacity 
+                style={[styles.chatSendBtn, { backgroundColor: theme.primary }]}
+                onPress={handleSendChatMessage}
+                disabled={isSendingMessage}
+              >
+                {isSendingMessage ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.chatSendBtnText}>Gönder</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -1040,5 +1353,243 @@ const styles = StyleSheet.create({
   innerBtnText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  // Chat Styles
+  clientChatBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  clientChatBtnText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  chatMsgRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginVertical: 4,
+  },
+  chatBubble: {
+    maxWidth: '75%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 4,
+  },
+  myBubble: {
+    borderBottomRightRadius: 2,
+  },
+  otherBubble: {
+    borderBottomLeftRadius: 2,
+  },
+  chatText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  chatTime: {
+    fontSize: 10,
+    alignSelf: 'flex-end',
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    padding: 12,
+    borderTopWidth: 1,
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  chatInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    fontSize: 14,
+  },
+  chatSendBtn: {
+    width: 70,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatSendBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  // Broadcast announcement bubble
+  broadcastBubble: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FFE0B2',
+    borderWidth: 1,
+    borderBottomLeftRadius: 2,
+    width: '90%',
+    maxWidth: '90%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 4,
+  },
+  broadcastTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#E65100',
+  },
+  broadcastContent: {
+    fontSize: 14,
+    color: '#4E342E',
+    lineHeight: 20,
+  },
+  broadcastFooter: {
+    fontSize: 10,
+    color: '#E65100',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  // Segmented control styles
+  chartSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ECEFF1',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 12,
+  },
+  chartSelectorTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  chartSelectorTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  chartSelectorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#546E7A',
+  },
+  chartSelectorTextActive: {
+    color: '#2E7D32',
+    fontWeight: 'bold',
+  },
+  // Chart card styles
+  chartCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  emptyChartCard: {
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  chartHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartHeaderSubtitle: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  chartHeaderTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  trendContainer: {
+    alignItems: 'flex-end',
+  },
+  trendBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  trendLabel: {
+    fontSize: 9,
+  },
+  chartContentContainer: {
+    flexDirection: 'row',
+    height: 160,
+    alignItems: 'stretch',
+  },
+  yAxisLabels: {
+    width: 32,
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    alignItems: 'flex-end',
+    paddingRight: 6,
+  },
+  yAxisText: {
+    fontSize: 10,
+  },
+  chartScrollContent: {
+    flexGrow: 1,
+    paddingLeft: 8,
+    paddingRight: 16,
+  },
+  chartBarsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: '100%',
+    gap: 12,
+  },
+  chartBarCol: {
+    width: 36,
+    alignItems: 'center',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  barTrack: {
+    flex: 1,
+    width: 14,
+    backgroundColor: '#ECEFF1',
+    borderRadius: 7,
+    justifyContent: 'flex-end',
+    marginBottom: 6,
+  },
+  barFill: {
+    width: 14,
+    borderRadius: 7,
+  },
+  barDateText: {
+    fontSize: 9,
+  },
+  barDateTextActive: {
+    fontWeight: 'bold',
+  },
+  chartDetailBox: {
+    borderTopWidth: 1,
+    marginTop: 16,
+    paddingTop: 12,
+    gap: 4,
+  },
+  chartDetailText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chartNoteText: {
+    fontSize: 11,
+    fontStyle: 'italic',
   },
 });
