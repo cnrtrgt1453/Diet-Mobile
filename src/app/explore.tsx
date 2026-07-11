@@ -32,6 +32,9 @@ export default function ExploreScreen() {
   const [mWeight, setMWeight] = useState('');
   const [mFat, setMFat] = useState('');
   const [mMuscle, setMMuscle] = useState('');
+  const [mAnkle, setMAnkle] = useState('');
+  const [mCalf, setMCalf] = useState('');
+  const [mThigh, setMThigh] = useState('');
   const [mNote, setMNote] = useState('');
 
   // Diyet Ekleme Modalı State'leri
@@ -42,13 +45,16 @@ export default function ExploreScreen() {
   const [dDinner, setDDinner] = useState('');
   const [dSnacks, setDSnacks] = useState('');
   const [dCalories, setDCalories] = useState('');
+  const [dProtein, setDProtein] = useState('');
+  const [dCarbs, setDCarbs] = useState('');
+  const [dFat, setDFat] = useState('');
   const [dDate, setDDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
   // Danışan Modu (ROLE_USER) State'leri
   const [myMeasurements, setMyMeasurements] = useState<any[]>([]);
   const [myDiets, setMyDiets] = useState<any[]>([]);
   const [myDailyLogs, setMyDailyLogs] = useState<any[]>([]);
-  const [activeChartTab, setActiveChartTab] = useState<'WEIGHT' | 'FAT' | 'WATER'>('WEIGHT');
+  const [activeChartTab, setActiveChartTab] = useState<'WEIGHT' | 'FAT' | 'WATER' | 'CIRCUMFERENCE'>('WEIGHT');
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
 
   // Sohbet (Chat) State'leri
@@ -183,6 +189,17 @@ export default function ExploreScreen() {
           note: m.note,
           details: `Ağırlık: ${m.weight} kg | Kas: ${m.muscleMass || '-'} kg`
         }));
+    } else if (activeChartTab === 'CIRCUMFERENCE') {
+      return [...myMeasurements]
+        .filter(m => m.thighCircumference !== null && m.thighCircumference !== undefined)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(m => ({
+          date: m.date,
+          value: m.thighCircumference,
+          label: m.thighCircumference + ' cm',
+          note: m.note,
+          details: `Uyluk: ${m.thighCircumference} cm | Baldır: ${m.calfCircumference || '-'} cm | Bilek: ${m.ankleCircumference || '-'} cm`
+        }));
     } else {
       return [...myDailyLogs]
         .filter(l => l.waterIntakeMl !== null && l.waterIntakeMl !== undefined)
@@ -302,6 +319,9 @@ export default function ExploreScreen() {
         weight: parseFloat(mWeight),
         bodyFat: mFat ? parseFloat(mFat) : null,
         muscleMass: mMuscle ? parseFloat(mMuscle) : null,
+        ankleCircumference: mAnkle ? parseFloat(mAnkle) : null,
+        calfCircumference: mCalf ? parseFloat(mCalf) : null,
+        thighCircumference: mThigh ? parseFloat(mThigh) : null,
         note: mNote,
         date: new Date().toISOString().split('T')[0]
       };
@@ -319,6 +339,9 @@ export default function ExploreScreen() {
       setMWeight('');
       setMFat('');
       setMMuscle('');
+      setMAnkle('');
+      setMCalf('');
+      setMThigh('');
       setMNote('');
       setIsMeasurementModalVisible(false);
       loadData();
@@ -341,6 +364,9 @@ export default function ExploreScreen() {
         dinner: dDinner,
         snacks: dSnacks,
         targetCalories: parseInt(dCalories),
+        targetProteinGrams: dProtein ? parseInt(dProtein) : null,
+        targetCarbsGrams: dCarbs ? parseInt(dCarbs) : null,
+        targetFatGrams: dFat ? parseInt(dFat) : null,
         date: dDate
       };
 
@@ -358,6 +384,9 @@ export default function ExploreScreen() {
       setDDinner('');
       setDSnacks('');
       setDCalories('');
+      setDProtein('');
+      setDCarbs('');
+      setDFat('');
       setDDate(new Date().toISOString().split('T')[0]);
       setIsDietPlanModalVisible(false);
     } catch (e) {
@@ -490,6 +519,12 @@ export default function ExploreScreen() {
               >
                 <Text style={[styles.chartSelectorText, activeChartTab === 'WATER' && styles.chartSelectorTextActive]}>💧 Su</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chartSelectorTab, activeChartTab === 'CIRCUMFERENCE' && styles.chartSelectorTabActive]}
+                onPress={() => { setActiveChartTab('CIRCUMFERENCE'); setSelectedPointIndex(null); }}
+              >
+                <Text style={[styles.chartSelectorText, activeChartTab === 'CIRCUMFERENCE' && styles.chartSelectorTextActive]}>📏 Çevre</Text>
+              </TouchableOpacity>
             </View>
 
             {chartData.length > 0 ? (
@@ -508,7 +543,7 @@ export default function ExploreScreen() {
                     {trendVal !== 0 && (
                       <View style={[styles.trendBadge, { backgroundColor: trendVal < 0 ? '#E8F5E9' : '#FFEBEE' }]}>
                         <Text style={{ color: trendVal < 0 ? '#2E7D32' : '#C62828', fontWeight: 'bold', fontSize: 11 }}>
-                          {trendVal < 0 ? '↓' : '↑'} {Math.abs(trendVal).toFixed(1)} {activeChartTab === 'WATER' ? 'L' : activeChartTab === 'FAT' ? '%' : 'kg'}
+                          {trendVal < 0 ? '↓' : '↑'} {Math.abs(trendVal).toFixed(1)} {activeChartTab === 'WATER' ? 'L' : activeChartTab === 'FAT' ? '%' : activeChartTab === 'CIRCUMFERENCE' ? 'cm' : 'kg'}
                         </Text>
                       </View>
                     )}
@@ -609,6 +644,13 @@ export default function ExploreScreen() {
                         {m.muscleMass ? `Kas: ${m.muscleMass} kg` : ''}
                       </ThemedText>
                     )}
+                    {(m.ankleCircumference || m.calfCircumference || m.thighCircumference) && (
+                      <ThemedText style={styles.historyCardDetails}>
+                        📏 {m.ankleCircumference ? `Bilek: ${m.ankleCircumference} cm ` : ''}
+                        {m.calfCircumference ? `Baldır: ${m.calfCircumference} cm ` : ''}
+                        {m.thighCircumference ? `Uyluk: ${m.thighCircumference} cm` : ''}
+                      </ThemedText>
+                    )}
                     {m.note && <ThemedText style={styles.historyCardNote}>Not: {m.note}</ThemedText>}
                   </View>
                 ))}
@@ -630,11 +672,61 @@ export default function ExploreScreen() {
                       </ThemedText>
                     </View>
                     <ThemedText style={styles.historyCardDate}>{d.date} | {d.targetCalories} kcal</ThemedText>
+                    {(d.targetProteinGrams || d.targetCarbsGrams || d.targetFatGrams) && (
+                      <ThemedText style={styles.historyCardDetails}>
+                        🥩 P: {d.targetProteinGrams || '-'}g | K: {d.targetCarbsGrams || '-'}g | Y: {d.targetFatGrams || '-'}g
+                      </ThemedText>
+                    )}
                   </View>
                 ))}
               </View>
             ) : (
               <ThemedText style={styles.emptyText}>Geçmiş diyet bulunmuyor.</ThemedText>
+            )}
+
+            {/* Günlük Log Geçmişi (Klinik Semptomlar) */}
+            <ThemedText style={styles.subSectionTitle}>📝 Günlük Log Geçmişiniz</ThemedText>
+            {myDailyLogs.length > 0 ? (
+              <View style={styles.historyList}>
+                {myDailyLogs.slice(0, 14).map((log: any) => (
+                  <View key={log.id} style={[styles.historyCard, { backgroundColor: theme.backgroundElement }]}>
+                    <View style={styles.historyCardHeader}>
+                      <ThemedText style={styles.historyCardDate}>{log.logDate}</ThemedText>
+                      <ThemedText style={styles.historyCardWeight}>💧 {log.waterIntakeMl ? (log.waterIntakeMl / 1000).toFixed(1) + ' L' : '-'}</ThemedText>
+                    </View>
+                    {/* GLP-1 Semptomları */}
+                    {(log.nauseaLevel || log.constipationLevel || log.diarrheaLevel || log.injectionSite) ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {log.nauseaLevel ? <Text style={styles.clinicalBadge}>🤢 Bulantı: {log.nauseaLevel}/10</Text> : null}
+                        {log.constipationLevel ? <Text style={styles.clinicalBadge}>💊 Kabızlık: {log.constipationLevel}/10</Text> : null}
+                        {log.diarrheaLevel ? <Text style={styles.clinicalBadge}>⚡ İshal: {log.diarrheaLevel}/10</Text> : null}
+                        {log.injectionSite ? <Text style={styles.clinicalBadge}>💉 {log.injectionSite}</Text> : null}
+                        {log.vomiting ? <Text style={styles.clinicalBadge}>🔴 Kusma</Text> : null}
+                      </View>
+                    ) : null}
+                    {/* Lipödem */}
+                    {(log.legPainVas || log.processedFoodFree || log.alcoholFree) ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {log.legPainVas ? <Text style={styles.clinicalBadge}>🦵 Ağrı VAS: {log.legPainVas}/10</Text> : null}
+                        {log.processedFoodFree ? <Text style={styles.clinicalBadgeGreen}>✅ İşlenmiş gıdasız</Text> : null}
+                        {log.alcoholFree ? <Text style={styles.clinicalBadgeGreen}>✅ Alkolsüz</Text> : null}
+                      </View>
+                    ) : null}
+                    {/* PCOS / Hormonal */}
+                    {(log.fastingGlucose || log.insulinLevel || log.menstrualCycleDay || log.sweetCravingSeverity) ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {log.fastingGlucose ? <Text style={styles.clinicalBadge}>🩸 Glikoz: {log.fastingGlucose} mg/dL</Text> : null}
+                        {log.insulinLevel ? <Text style={styles.clinicalBadge}>💉 İnsülin: {log.insulinLevel}</Text> : null}
+                        {log.menstrualCycleDay ? <Text style={styles.clinicalBadge}>🔴 Döngü günü: {log.menstrualCycleDay}</Text> : null}
+                        {log.sweetCravingSeverity ? <Text style={styles.clinicalBadge}>🍫 Tatlı krizi: {log.sweetCravingSeverity}/10</Text> : null}
+                      </View>
+                    ) : null}
+                    {log.notes && <ThemedText style={styles.historyCardNote}>📝 {log.notes}</ThemedText>}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <ThemedText style={styles.emptyText}>Henüz günlük log girişi bulunmuyor.</ThemedText>
             )}
             
             {/* Klinik İletişim Bilgileri */}
@@ -709,25 +801,36 @@ export default function ExploreScreen() {
                       
                       {selectedClient.category === 'GLP_1' && (
                         <View style={styles.logReportMeta}>
-                          <ThemedText style={styles.logReportText}>💉 Yan Etki Düzeyi: <ThemedText style={styles.boldText}>{log.glp1SideEffectLevel || 0}/5</ThemedText></ThemedText>
-                          {log.glp1SideEffects ? <ThemedText style={styles.logReportNote}>Semptomlar: {log.glp1SideEffects}</ThemedText> : null}
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {log.nauseaLevel ? <Text style={styles.clinicalBadge}>🤢 Bulantı: {log.nauseaLevel}/10</Text> : null}
+                            {log.constipationLevel ? <Text style={styles.clinicalBadge}>💊 Kabızlık: {log.constipationLevel}/10</Text> : null}
+                            {log.diarrheaLevel ? <Text style={styles.clinicalBadge}>⚡ İshal: {log.diarrheaLevel}/10</Text> : null}
+                            {log.vomiting ? <Text style={styles.clinicalBadge}>🔴 Kusma</Text> : null}
+                            {log.injectionSite ? <Text style={styles.clinicalBadge}>💉 Enjeksiyon: {log.injectionSite}</Text> : null}
+                          </View>
+                          {log.glp1SideEffects ? <ThemedText style={styles.logReportNote}>Ek not: {log.glp1SideEffects}</ThemedText> : null}
                         </View>
                       )}
 
                       {selectedClient.category === 'LIPEDEMA' && (
                         <View style={styles.logReportMeta}>
-                          <ThemedText style={styles.logReportText}>🦵 Bacak Ağrısı: <ThemedText style={styles.boldText}>{log.lipedemaPainLevel || 0}/5</ThemedText></ThemedText>
-                          <View style={styles.logReportChips}>
-                            <View style={[styles.miniChip, log.glutenFreeCompliant ? styles.chipSuccess : styles.chipError]}><ThemedText style={styles.miniChipText}>Glütensiz</ThemedText></View>
-                            <View style={[styles.miniChip, log.sugarFreeCompliant ? styles.chipSuccess : styles.chipError]}><ThemedText style={styles.miniChipText}>Şekersiz</ThemedText></View>
-                            <View style={[styles.miniChip, log.dairyFreeCompliant ? styles.chipSuccess : styles.chipError]}><ThemedText style={styles.miniChipText}>Sütsüz</ThemedText></View>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {log.legPainVas ? <Text style={styles.clinicalBadge}>🦵 Ağrı VAS: {log.legPainVas}/10</Text> : null}
+                            {log.processedFoodFree ? <Text style={styles.clinicalBadgeGreen}>✅ İşlenmiş gıdasız</Text> : null}
+                            {log.alcoholFree ? <Text style={styles.clinicalBadgeGreen}>✅ Alkolsüz</Text> : null}
                           </View>
                         </View>
                       )}
 
                       {selectedClient.category === 'HORMONAL_BALANCE' && (
                         <View style={styles.logReportMeta}>
-                          <ThemedText style={styles.logReportText}>🧬 Döngü Fazı: <ThemedText style={styles.boldText}>{log.currentHormonalPhase || "Girilmedi"}</ThemedText></ThemedText>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {log.menstrualCycleDay ? <Text style={styles.clinicalBadge}>🔴 Döngü günü: {log.menstrualCycleDay}</Text> : null}
+                            {log.fastingGlucose ? <Text style={styles.clinicalBadge}>🩸 Glikoz: {log.fastingGlucose} mg/dL</Text> : null}
+                            {log.insulinLevel ? <Text style={styles.clinicalBadge}>💉 İnsülin: {log.insulinLevel}</Text> : null}
+                            {log.sweetCravingSeverity ? <Text style={styles.clinicalBadge}>🍫 Tatlı krizi: {log.sweetCravingSeverity}/10</Text> : null}
+                          </View>
+                          {log.currentHormonalPhase ? <ThemedText style={styles.logReportNote}>Faz: {log.currentHormonalPhase}</ThemedText> : null}
                         </View>
                       )}
                     </View>
@@ -744,6 +847,13 @@ export default function ExploreScreen() {
                       <ThemedText style={styles.detailRowDate}>{m.date}</ThemedText>
                       <ThemedText style={styles.detailRowWeight}>{m.weight} kg</ThemedText>
                       <ThemedText style={styles.detailRowFat}>Yağ: %{m.bodyFat || "-"}</ThemedText>
+                      {(m.ankleCircumference || m.calfCircumference || m.thighCircumference) && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                          {m.ankleCircumference ? <Text style={styles.clinicalBadge}>Bilek: {m.ankleCircumference} cm</Text> : null}
+                          {m.calfCircumference ? <Text style={styles.clinicalBadge}>Baldır: {m.calfCircumference} cm</Text> : null}
+                          {m.thighCircumference ? <Text style={styles.clinicalBadge}>Uyluk: {m.thighCircumference} cm</Text> : null}
+                        </View>
+                      )}
                     </View>
                   ))
                 ) : (
@@ -760,6 +870,11 @@ export default function ExploreScreen() {
                       <ThemedText style={styles.detailRowStatus}>
                         {d.completed ? "✓ Uyumlu" : "✗ Bekliyor"}
                       </ThemedText>
+                      {(d.targetProteinGrams || d.targetCarbsGrams || d.targetFatGrams) && (
+                        <ThemedText style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
+                          🥩 P: {d.targetProteinGrams || '-'}g | K: {d.targetCarbsGrams || '-'}g | Y: {d.targetFatGrams || '-'}g
+                        </ThemedText>
+                      )}
                     </View>
                   ))
                 ) : (
@@ -812,6 +927,33 @@ export default function ExploreScreen() {
               keyboardType="numeric"
               value={mMuscle}
               onChangeText={setMMuscle}
+            />
+
+            <TextInput 
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
+              placeholder="Bilek Çevresi (cm) - Örn: 22.0"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              value={mAnkle}
+              onChangeText={setMAnkle}
+            />
+
+            <TextInput 
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
+              placeholder="Baldır Çevresi (cm) - Örn: 36.5"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              value={mCalf}
+              onChangeText={setMCalf}
+            />
+
+            <TextInput 
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
+              placeholder="Uyluk Çevresi (cm) - Örn: 55.4"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numeric"
+              value={mThigh}
+              onChangeText={setMThigh}
             />
 
             <TextInput 
@@ -884,6 +1026,34 @@ export default function ExploreScreen() {
                 value={dCalories}
                 onChangeText={setDCalories}
               />
+
+              <ThemedText style={styles.inputLabel}>🥩 Makro Hedefleri (gram)</ThemedText>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput 
+                  style={[styles.textInput, { flex: 1, borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                  placeholder="Protein"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="numeric"
+                  value={dProtein}
+                  onChangeText={setDProtein}
+                />
+                <TextInput 
+                  style={[styles.textInput, { flex: 1, borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                  placeholder="Karbonhidrat"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="numeric"
+                  value={dCarbs}
+                  onChangeText={setDCarbs}
+                />
+                <TextInput 
+                  style={[styles.textInput, { flex: 1, borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                  placeholder="Yağ"
+                  placeholderTextColor={theme.textSecondary}
+                  keyboardType="numeric"
+                  value={dFat}
+                  onChangeText={setDFat}
+                />
+              </View>
 
               <ThemedText style={styles.inputLabel}>🍳 Kahvaltı</ThemedText>
               <TextInput 
@@ -1675,5 +1845,25 @@ const styles = StyleSheet.create({
   chartNoteText: {
     fontSize: 11,
     fontStyle: 'italic',
+  },
+  clinicalBadge: {
+    fontSize: 10,
+    backgroundColor: '#FFF3E0',
+    color: '#E65100',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
+    fontWeight: '600',
+  },
+  clinicalBadgeGreen: {
+    fontSize: 10,
+    backgroundColor: '#E8F5E9',
+    color: '#2E7D32',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
+    fontWeight: '600',
   },
 });
