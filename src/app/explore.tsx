@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
+import { LineChart, BarChart } from 'react-native-gifted-charts';
 
 export default function ExploreScreen() {
   const { userInfo, userToken } = useAuth();
@@ -517,44 +518,61 @@ export default function ExploreScreen() {
 
                 {/* Grafik Alanı */}
                 <View style={styles.chartContentContainer}>
-                  {/* Y Ekseni Etiketleri */}
-                  <View style={styles.yAxisLabels}>
-                    <Text style={[styles.yAxisText, { color: theme.textSecondary }]}>{maxVal.toFixed(1)}</Text>
-                    <Text style={[styles.yAxisText, { color: theme.textSecondary }]}>{midVal.toFixed(1)}</Text>
-                    <Text style={[styles.yAxisText, { color: theme.textSecondary }]}>{minVal.toFixed(1)}</Text>
-                  </View>
-
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartScrollContent}>
-                    <View style={styles.chartBarsRow}>
-                      {chartData.map((point, index) => {
-                        const isSelected = selectedPointIndex === index || (selectedPointIndex === null && index === chartData.length - 1);
-                        const heightPct = maxVal === minVal ? 50 : ((point.value - minVal) / (maxVal - minVal)) * 70 + 20;
-
-                        return (
-                          <TouchableOpacity
-                            key={index}
-                            style={styles.chartBarCol}
-                            onPress={() => setSelectedPointIndex(index)}
-                          >
-                            <View style={styles.barTrack}>
-                              <View 
-                                style={[
-                                  styles.barFill, 
-                                  { 
-                                    height: `${heightPct}%`,
-                                    backgroundColor: isSelected ? theme.primary : '#A5D6A7'
-                                  }
-                                ]} 
-                              />
-                            </View>
-                            <Text style={[styles.barDateText, { color: theme.textSecondary }, isSelected && [styles.barDateTextActive, { color: theme.primary }]]}>
-                              {point.date.substring(5).replace('-', '/')}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </ScrollView>
+                  {activeChartTab === 'WATER' ? (
+                    <BarChart
+                      data={chartData.map((point, index) => ({
+                        value: point.value,
+                        label: point.date.substring(8, 10) + '/' + point.date.substring(5, 7),
+                        frontColor: (selectedPointIndex === index || (selectedPointIndex === null && index === chartData.length - 1)) ? theme.primary : '#A5D6A7',
+                        onPress: () => setSelectedPointIndex(index),
+                      }))}
+                      width={280}
+                      height={180}
+                      barWidth={22}
+                      spacing={18}
+                      noOfSections={4}
+                      yAxisThickness={1}
+                      xAxisThickness={1}
+                      yAxisColor={theme.backgroundSelected}
+                      xAxisColor={theme.backgroundSelected}
+                      yAxisTextStyle={{ color: theme.textSecondary, fontSize: 10 }}
+                      xAxisLabelTextStyle={{ color: theme.textSecondary, fontSize: 9 }}
+                      hideRules
+                      showVerticalLines={false}
+                    />
+                  ) : (
+                    <LineChart
+                      data={chartData.map((point, index) => ({
+                        value: point.value,
+                        label: point.date.substring(8, 10) + '/' + point.date.substring(5, 7),
+                        dataPointText: point.value.toFixed(1),
+                        textColor: theme.text,
+                        textShiftY: -8,
+                        textShiftX: -10,
+                        textFontSize: 9,
+                        dataPointColor: (selectedPointIndex === index || (selectedPointIndex === null && index === chartData.length - 1)) ? theme.primary : '#81C784',
+                        dataPointRadius: (selectedPointIndex === index || (selectedPointIndex === null && index === chartData.length - 1)) ? 6 : 4,
+                      }))}
+                      width={280}
+                      height={180}
+                      thickness={3}
+                      color={theme.primary}
+                      noOfSections={4}
+                      yAxisThickness={1}
+                      xAxisThickness={1}
+                      yAxisColor={theme.backgroundSelected}
+                      xAxisColor={theme.backgroundSelected}
+                      yAxisTextStyle={{ color: theme.textSecondary, fontSize: 10 }}
+                      xAxisLabelTextStyle={{ color: theme.textSecondary, fontSize: 9 }}
+                      initialSpacing={20}
+                      spacing={40}
+                      hideRules
+                      showVerticalLines={false}
+                      onPress={(item: any, index: number) => {
+                        setSelectedPointIndex(index);
+                      }}
+                    />
+                  )}
                 </View>
 
                 {/* Seçili noktanın detayları ve notu */}
@@ -1594,9 +1612,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   chartContentContainer: {
-    flexDirection: 'row',
-    height: 160,
-    alignItems: 'stretch',
+    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 10,
   },
   yAxisLabels: {
     width: 32,
