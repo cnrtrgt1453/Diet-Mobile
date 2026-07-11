@@ -391,7 +391,7 @@ export default function ExploreScreen() {
             
             {/* Arama Barı */}
             <TextInput 
-              style={[styles.searchInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+              style={[styles.searchInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
               placeholder="İsim veya e-posta ile ara..."
               placeholderTextColor={theme.textSecondary}
               value={searchQuery}
@@ -788,7 +788,7 @@ export default function ExploreScreen() {
             <ThemedText type="subtitle" style={styles.innerModalTitle}>⚖️ Yeni Ölçüm Kaydı</ThemedText>
             
             <TextInput 
-              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
               placeholder="Ağırlık (kg) - Örn: 76.2"
               placeholderTextColor={theme.textSecondary}
               keyboardType="numeric"
@@ -797,7 +797,7 @@ export default function ExploreScreen() {
             />
 
             <TextInput 
-              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
               placeholder="Yağ Oranı (%) - Örn: 22.4"
               placeholderTextColor={theme.textSecondary}
               keyboardType="numeric"
@@ -806,7 +806,7 @@ export default function ExploreScreen() {
             />
 
             <TextInput 
-              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
               placeholder="Kas Kütlesi (kg) - Örn: 30.1"
               placeholderTextColor={theme.textSecondary}
               keyboardType="numeric"
@@ -815,7 +815,7 @@ export default function ExploreScreen() {
             />
 
             <TextInput 
-              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+              style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
               placeholder="Seans Notu..."
               placeholderTextColor={theme.textSecondary}
               value={mNote}
@@ -824,10 +824,10 @@ export default function ExploreScreen() {
 
             <View style={styles.innerActionRow}>
               <TouchableOpacity 
-                style={[styles.innerBtn, styles.cancelBtn]} 
+                style={[styles.innerBtn, styles.cancelBtn, { backgroundColor: theme.backgroundSelected }]} 
                 onPress={() => setIsMeasurementModalVisible(false)}
               >
-                <ThemedText style={styles.cancelBtnText}>İptal</ThemedText>
+                <ThemedText style={[styles.cancelBtnText, { color: theme.textSecondary }]}>İptal</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.innerBtn, { backgroundColor: theme.primary }]} 
@@ -861,7 +861,7 @@ export default function ExploreScreen() {
             <View style={styles.modalForm}>
               <ThemedText style={styles.inputLabel}>Diyet Günü Başlığı</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Örn: Pazartesi Detoksu"
                 placeholderTextColor={theme.textSecondary}
                 value={dTitle}
@@ -870,14 +870,14 @@ export default function ExploreScreen() {
 
               <ThemedText style={styles.inputLabel}>Tarih (YYYY-MM-DD)</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 value={dDate}
                 onChangeText={setDDate}
               />
 
               <ThemedText style={styles.inputLabel}>Hedef Kalori</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Örn: 1400"
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
@@ -887,7 +887,7 @@ export default function ExploreScreen() {
 
               <ThemedText style={styles.inputLabel}>🍳 Kahvaltı</ThemedText>
               <TextInput 
-                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Kahvaltı menüsü..."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}
@@ -898,7 +898,7 @@ export default function ExploreScreen() {
 
               <ThemedText style={styles.inputLabel}>🍲 Öğle Yemeği</ThemedText>
               <TextInput 
-                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Öğle yemeği menüsü..."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}
@@ -909,7 +909,7 @@ export default function ExploreScreen() {
 
               <ThemedText style={styles.inputLabel}>🥗 Akşam Yemeği</ThemedText>
               <TextInput 
-                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Akşam yemeği menüsü..."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}
@@ -920,7 +920,7 @@ export default function ExploreScreen() {
 
               <ThemedText style={styles.inputLabel}>☕ Ara Öğün & Atıştırmalıklar</ThemedText>
               <TextInput 
-                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Ara öğünler..."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}

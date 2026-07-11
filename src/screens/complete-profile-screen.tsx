@@ -14,9 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
+import { useTheme } from '@/hooks/use-theme';
 
 export const CompleteProfileScreen: React.FC = () => {
   const { userToken, showAlert, refreshUserInfo, logout } = useAuth();
+  const theme = useTheme();
   
   const [loading, setLoading] = useState(false);
   const [height, setHeight] = useState('');
@@ -86,7 +88,7 @@ export const CompleteProfileScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -95,20 +97,21 @@ export const CompleteProfileScreen: React.FC = () => {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.logoLeaf}>🥗</Text>
-            <Text style={styles.title}>Profilini Tamamla</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: theme.primary }]}>Profilini Tamamla</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               Diyetisyeninizin size özel program oluşturabilmesi için bilgilerinizi eksiksiz doldurun.
             </Text>
           </View>
 
           {/* Form Card */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
             {/* Height */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Boy (cm) *</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Boy (cm) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.backgroundSelected }]}
                 placeholder="Örn: 165"
+                placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
                 value={height}
                 onChangeText={setHeight}
@@ -117,10 +120,11 @@ export const CompleteProfileScreen: React.FC = () => {
 
             {/* Current Weight */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Mevcut Ağırlık (kg) *</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Mevcut Ağırlık (kg) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.backgroundSelected }]}
                 placeholder="Örn: 75.5"
+                placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
                 value={currentWeight}
                 onChangeText={setCurrentWeight}
@@ -129,10 +133,11 @@ export const CompleteProfileScreen: React.FC = () => {
 
             {/* Target Weight */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Hedef Ağırlık (kg) *</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Hedef Ağırlık (kg) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.backgroundSelected }]}
                 placeholder="Örn: 65.0"
+                placeholderTextColor={theme.textSecondary}
                 keyboardType="numeric"
                 value={targetWeight}
                 onChangeText={setTargetWeight}
@@ -141,7 +146,7 @@ export const CompleteProfileScreen: React.FC = () => {
 
             {/* Category Selector */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Takip Programı Kategorisi *</Text>
+              <Text style={[styles.label, { color: theme.text }]}>Takip Programı Kategorisi *</Text>
               <View style={styles.categoryContainer}>
                 {(
                   [
@@ -155,14 +160,16 @@ export const CompleteProfileScreen: React.FC = () => {
                     key={item.id}
                     style={[
                       styles.categoryButton,
-                      category === item.id && styles.categoryButtonActive,
+                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+                      category === item.id && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
                     ]}
                     onPress={() => setCategory(item.id)}
                   >
                     <Text
                       style={[
                         styles.categoryText,
-                        category === item.id && styles.categoryTextActive,
+                        { color: theme.text },
+                        category === item.id && { color: theme.primary, fontWeight: 'bold' },
                       ]}
                     >
                       {item.label}
@@ -174,22 +181,23 @@ export const CompleteProfileScreen: React.FC = () => {
 
             {/* Conditional Fields based on Category */}
             {category === 'GLP_1' && (
-              <View style={styles.extraSection}>
-                <Text style={styles.extraTitle}>💉 GLP-1 Takip Detayları</Text>
+              <View style={[styles.extraSection, { borderColor: theme.backgroundSelected }]}>
+                <Text style={[styles.extraTitle, { color: theme.primary }]}>💉 GLP-1 Takip Detayları</Text>
                 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Enjeksiyon Günü</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>Enjeksiyon Günü</Text>
                   <View style={styles.selectRow}>
                     {['Pazartesi', 'Çarşamba', 'Cuma', 'Pazar'].map((day) => (
                       <TouchableOpacity
                         key={day}
                         style={[
                           styles.subSelectButton,
-                          glp1InjectionDay === day && styles.subSelectButtonActive,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+                          glp1InjectionDay === day && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
                         ]}
                         onPress={() => setGlp1InjectionDay(day)}
                       >
-                        <Text style={[styles.subSelectText, glp1InjectionDay === day && styles.subSelectTextActive]}>
+                        <Text style={[styles.subSelectText, { color: theme.textSecondary }, glp1InjectionDay === day && { color: theme.primary, fontWeight: 'bold' }]}>
                           {day.substring(0, 3)}
                         </Text>
                       </TouchableOpacity>
@@ -198,10 +206,11 @@ export const CompleteProfileScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Dozaj</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>Dozaj</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.backgroundSelected }]}
                     placeholder="Örn: 0.5 mg"
+                    placeholderTextColor={theme.textSecondary}
                     value={glp1Dosage}
                     onChangeText={setGlp1Dosage}
                   />
@@ -210,22 +219,23 @@ export const CompleteProfileScreen: React.FC = () => {
             )}
 
             {category === 'LIPEDEMA' && (
-              <View style={styles.extraSection}>
-                <Text style={styles.extraTitle}>🦵 Lipödem Takip Detayları</Text>
+              <View style={[styles.extraSection, { borderColor: theme.backgroundSelected }]}>
+                <Text style={[styles.extraTitle, { color: theme.primary }]}>🦵 Lipödem Takip Detayları</Text>
                 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Lipödem Evresi</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>Lipödem Evresi</Text>
                   <View style={styles.selectRow}>
                     {['1', '2', '3', '4'].map((stage) => (
                       <TouchableOpacity
                         key={stage}
                         style={[
                           styles.subSelectButton,
-                          lipedemaStage === stage && styles.subSelectButtonActive,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+                          lipedemaStage === stage && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
                         ]}
                         onPress={() => setLipedemaStage(stage)}
                       >
-                        <Text style={[styles.subSelectText, lipedemaStage === stage && styles.subSelectTextActive]}>
+                        <Text style={[styles.subSelectText, { color: theme.textSecondary }, lipedemaStage === stage && { color: theme.primary, fontWeight: 'bold' }]}>
                           Evre {stage}
                         </Text>
                       </TouchableOpacity>
@@ -234,10 +244,10 @@ export const CompleteProfileScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.switchGroup}>
-                  <Text style={styles.switchLabel}>Anti-inflamatuar Diyete Uyum</Text>
+                  <Text style={[styles.switchLabel, { color: theme.text }]}>Anti-inflamatuar Diyete Uyum</Text>
                   <Switch
-                    trackColor={{ false: '#767577', true: '#81C784' }}
-                    thumbColor={antiInflammatoryCompliant ? '#2E7D32' : '#f4f3f4'}
+                    trackColor={{ false: theme.backgroundSelected, true: theme.primary }}
+                    thumbColor={antiInflammatoryCompliant ? theme.background : '#f4f3f4'}
                     value={antiInflammatoryCompliant}
                     onValueChange={setAntiInflammatoryCompliant}
                   />
@@ -246,11 +256,11 @@ export const CompleteProfileScreen: React.FC = () => {
             )}
 
             {category === 'HORMONAL_BALANCE' && (
-              <View style={styles.extraSection}>
-                <Text style={styles.extraTitle}>🧬 Hormonal Denge Detayları</Text>
+              <View style={[styles.extraSection, { borderColor: theme.backgroundSelected }]}>
+                <Text style={[styles.extraTitle, { color: theme.primary }]}>🧬 Hormonal Denge Detayları</Text>
                 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Hedef Döngü / Faz</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>Hedef Döngü / Faz</Text>
                   <View style={styles.categoryContainer}>
                     {['Menstrüasyon', 'Foliküler Faz', 'Ovulasyon', 'Luteal Faz'].map((phase) => (
                       <TouchableOpacity
@@ -258,11 +268,12 @@ export const CompleteProfileScreen: React.FC = () => {
                         style={[
                           styles.categoryButton,
                           styles.halfWidth,
-                          hormoneTargetCycle === phase && styles.categoryButtonActive,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+                          hormoneTargetCycle === phase && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
                         ]}
                         onPress={() => setHormoneTargetCycle(phase)}
                       >
-                        <Text style={[styles.categoryText, hormoneTargetCycle === phase && styles.categoryTextActive]}>
+                        <Text style={[styles.categoryText, { color: theme.text }, hormoneTargetCycle === phase && { color: theme.primary, fontWeight: 'bold' }]}>
                           {phase}
                         </Text>
                       </TouchableOpacity>
@@ -274,7 +285,7 @@ export const CompleteProfileScreen: React.FC = () => {
 
             {/* Submit Button */}
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[styles.submitBtn, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
               onPress={handleSubmit}
               disabled={loading}
             >

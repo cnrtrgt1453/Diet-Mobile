@@ -852,10 +852,11 @@ export default function HomeScreen() {
   };
 
   const translateAppStatus = (status: string) => {
+    const isDark = theme.text === '#E2EFE5';
     switch (status) {
-      case 'APPROVED': return { text: 'Onaylandı', color: '#2E7D32', bg: '#E2EFE5' };
-      case 'REJECTED': return { text: 'Reddedildi', color: '#C62828', bg: '#FFEBEE' };
-      default: return { text: 'Onay Bekliyor', color: '#EF6C00', bg: '#FFF3E0' };
+      case 'APPROVED': return { text: 'Onaylandı', color: theme.primary, bg: theme.backgroundSelected };
+      case 'REJECTED': return { text: 'Reddedildi', color: isDark ? '#FF8A80' : '#C62828', bg: isDark ? 'rgba(211, 47, 47, 0.15)' : '#FFEBEE' };
+      default: return { text: 'Onay Bekliyor', color: isDark ? '#FFB74D' : '#EF6C00', bg: isDark ? 'rgba(239, 108, 0, 0.15)' : '#FFF3E0' };
     }
   };
 
@@ -1111,10 +1112,10 @@ export default function HomeScreen() {
                     </ThemedText>
                   </View>
                   <TouchableOpacity 
-                    style={styles.editProfileSummaryBtn}
+                    style={[styles.editProfileSummaryBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}
                     onPress={openClientEditProfile}
                   >
-                    <ThemedText style={styles.editProfileSummaryBtnText}>⚙️ Düzenle</ThemedText>
+                    <ThemedText style={[styles.editProfileSummaryBtnText, { color: theme.primary }]}>⚙️ Düzenle</ThemedText>
                   </TouchableOpacity>
                 </View>
                 <ThemedText style={styles.heightText}>Boy: {userInfo?.height || 0} cm</ThemedText>
@@ -1172,7 +1173,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.sectionTitle}>Bugünkü Diyet Programınız</ThemedText>
             
             {todayDiet ? (
-              <View style={[styles.dietCard, { borderColor: theme.primary, backgroundColor: '#FFFFFF' }]}>
+              <View style={[styles.dietCard, { borderColor: theme.primary, backgroundColor: theme.backgroundElement }]}>
                 <View style={[styles.dietCardHeader, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText style={styles.dietCardTitle}>🥗 {todayDiet.title || "Günlük Menü"}</ThemedText>
                   <ThemedText style={styles.dietCardCal}>{todayDiet.targetCalories} kcal</ThemedText>
@@ -1244,7 +1245,7 @@ export default function HomeScreen() {
                     {[1, 2, 3, 4, 5].map((num) => (
                       <TouchableOpacity
                         key={num}
-                        style={[styles.ratingBtn, sideEffectLevel === num ? { backgroundColor: theme.primary } : { backgroundColor: '#FFFFFF' }]}
+                        style={[styles.ratingBtn, sideEffectLevel === num ? { backgroundColor: theme.primary } : { backgroundColor: theme.background }]}
                         onPress={() => setSideEffectLevel(num)}
                       >
                         <ThemedText style={[styles.ratingText, sideEffectLevel === num ? { color: '#FFFFFF', fontWeight: 'bold' } : { color: theme.text }]}>{num}</ThemedText>
@@ -1261,7 +1262,7 @@ export default function HomeScreen() {
                           key={sym}
                           style={[
                             styles.symptomChip,
-                            selected ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.backgroundSelected, backgroundColor: '#FFFFFF' }
+                            selected ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.backgroundSelected, backgroundColor: theme.background }
                           ]}
                           onPress={() => {
                             if (selected) {
@@ -1287,7 +1288,7 @@ export default function HomeScreen() {
                     {[1, 2, 3, 4, 5].map((num) => (
                       <TouchableOpacity
                         key={num}
-                        style={[styles.ratingBtn, painLevel === num ? { backgroundColor: theme.primary } : { backgroundColor: '#FFFFFF' }]}
+                        style={[styles.ratingBtn, painLevel === num ? { backgroundColor: theme.primary } : { backgroundColor: theme.background }]}
                         onPress={() => setPainLevel(num)}
                       >
                         <ThemedText style={[styles.ratingText, painLevel === num ? { color: '#FFFFFF', fontWeight: 'bold' } : { color: theme.text }]}>{num}</ThemedText>
@@ -1298,24 +1299,24 @@ export default function HomeScreen() {
                   <ThemedText style={styles.logSubLabel}>Anti-Ödem Beslenme Uyumu</ThemedText>
                   <View style={styles.complianceRow}>
                     <TouchableOpacity 
-                      style={[styles.complianceCard, glutenFree ? { backgroundColor: '#C8E6C9' } : { backgroundColor: '#FFCDD2' }]}
+                      style={[styles.complianceCard, glutenFree ? { backgroundColor: theme.backgroundSelected } : { backgroundColor: 'rgba(211, 47, 47, 0.15)' }]}
                       onPress={() => setGlutenFree(!glutenFree)}
                     >
-                      <ThemedText style={styles.complianceText}>{glutenFree ? '✓ Glütensiz' : '✗ Glütenli'}</ThemedText>
+                      <ThemedText style={[styles.complianceText, { color: theme.text }]}>{glutenFree ? '✓ Glütensiz' : '✗ Glütenli'}</ThemedText>
                     </TouchableOpacity>
 
                     <TouchableOpacity 
-                      style={[styles.complianceCard, sugarFree ? { backgroundColor: '#C8E6C9' } : { backgroundColor: '#FFCDD2' }]}
+                      style={[styles.complianceCard, sugarFree ? { backgroundColor: theme.backgroundSelected } : { backgroundColor: 'rgba(211, 47, 47, 0.15)' }]}
                       onPress={() => setSugarFree(!sugarFree)}
                     >
-                      <ThemedText style={styles.complianceText}>{sugarFree ? '✓ Şekersiz' : '✗ Şekerli'}</ThemedText>
+                      <ThemedText style={[styles.complianceText, { color: theme.text }]}>{sugarFree ? '✓ Şekersiz' : '✗ Şekerli'}</ThemedText>
                     </TouchableOpacity>
 
                     <TouchableOpacity 
-                      style={[styles.complianceCard, dairyFree ? { backgroundColor: '#C8E6C9' } : { backgroundColor: '#FFCDD2' }]}
+                      style={[styles.complianceCard, dairyFree ? { backgroundColor: theme.backgroundSelected } : { backgroundColor: 'rgba(211, 47, 47, 0.15)' }]}
                       onPress={() => setDairyFree(!dairyFree)}
                     >
-                      <ThemedText style={styles.complianceText}>{dairyFree ? '✓ Sütsüz' : '✗ Sütlü'}</ThemedText>
+                      <ThemedText style={[styles.complianceText, { color: theme.text }]}>{dairyFree ? '✓ Sütsüz' : '✗ Sütlü'}</ThemedText>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1332,7 +1333,7 @@ export default function HomeScreen() {
                         style={[
                           styles.categorySelectBtn,
                           { borderColor: theme.primary, marginBottom: 6 },
-                          hormonalPhase === phase ? { backgroundColor: theme.primary } : { backgroundColor: '#FFFFFF' }
+                          hormonalPhase === phase ? { backgroundColor: theme.primary } : { backgroundColor: theme.background }
                         ]}
                         onPress={() => setHormonalPhase(phase)}
                       >
@@ -1515,14 +1516,14 @@ export default function HomeScreen() {
             <View style={styles.modalForm}>
               <ThemedText style={styles.inputLabel}>Randevu Tarihi (YYYY-MM-DD)</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                 value={appDate}
                 onChangeText={setAppDate}
               />
 
               <ThemedText style={styles.inputLabel}>Randevu Saati (HH:MM)</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                 placeholder="Örn: 14:30"
                 placeholderTextColor={theme.textSecondary}
                 value={appTime}
@@ -1531,7 +1532,7 @@ export default function HomeScreen() {
 
               <ThemedText style={styles.inputLabel}>Diyetisyeninize Not</ThemedText>
               <TextInput 
-                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                 placeholder="Randevu sebebi veya sormak istediğiniz sorular..."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}
@@ -1573,7 +1574,7 @@ export default function HomeScreen() {
             <View style={styles.modalForm}>
               <ThemedText style={styles.inputLabel}>Adı Soyadı</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Örn: Ayşe Yılmaz"
                 placeholderTextColor={theme.textSecondary}
                 value={name}
@@ -1582,7 +1583,7 @@ export default function HomeScreen() {
 
               <ThemedText style={styles.inputLabel}>E-posta Adresi</ThemedText>
               <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Örn: ayse.yilmaz@gmail.com"
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="email-address"
@@ -1595,7 +1596,7 @@ export default function HomeScreen() {
                 <View style={styles.inputRowCol}>
                   <ThemedText style={styles.inputLabel}>Boy (cm)</ThemedText>
                   <TextInput 
-                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                     placeholder="165"
                     placeholderTextColor={theme.textSecondary}
                     keyboardType="numeric"
@@ -1606,7 +1607,7 @@ export default function HomeScreen() {
                 <View style={styles.inputRowCol}>
                   <ThemedText style={styles.inputLabel}>Kilo (kg)</ThemedText>
                   <TextInput 
-                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                     placeholder="78.5"
                     placeholderTextColor={theme.textSecondary}
                     keyboardType="numeric"
@@ -1617,7 +1618,7 @@ export default function HomeScreen() {
                 <View style={styles.inputRowCol}>
                   <ThemedText style={styles.inputLabel}>Hedef (kg)</ThemedText>
                   <TextInput 
-                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                     placeholder="65.0"
                     placeholderTextColor={theme.textSecondary}
                     keyboardType="numeric"
@@ -1654,7 +1655,7 @@ export default function HomeScreen() {
                 <View style={styles.conditionalFields}>
                   <ThemedText style={styles.inputLabel}>Enjeksiyon Günü</ThemedText>
                   <TextInput 
-                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                     placeholder="Pazartesi"
                     placeholderTextColor={theme.textSecondary}
                     value={glp1InjectionDay}
@@ -1662,7 +1663,7 @@ export default function HomeScreen() {
                   />
                   <ThemedText style={styles.inputLabel}>İlaç Dozu (mg)</ThemedText>
                   <TextInput 
-                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                     placeholder="0.5 mg"
                     placeholderTextColor={theme.textSecondary}
                     value={glp1Dosage}
@@ -1701,7 +1702,7 @@ export default function HomeScreen() {
                 <View style={styles.conditionalFields}>
                   <ThemedText style={styles.inputLabel}>Hedef Döngü Fazı (PCOS, Tiroid Takip)</ThemedText>
                   <TextInput 
-                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                     placeholder="Luteal Faz / Genel Takip"
                     placeholderTextColor={theme.textSecondary}
                     value={hormoneTargetCycle}
@@ -1712,7 +1713,7 @@ export default function HomeScreen() {
 
               <ThemedText style={styles.inputLabel}>Klinik / Diyetisyen Notları</ThemedText>
               <TextInput 
-                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text }]} 
+                style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
                 placeholder="Danışan hakkında klinik gözlemleriniz..."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}
@@ -1745,8 +1746,8 @@ export default function HomeScreen() {
           <View style={[styles.notifModalContent, { backgroundColor: theme.background }]}>
             <View style={styles.notifModalHeader}>
               <ThemedText type="subtitle" style={styles.notifModalTitle}>🔔 Bildirimler</ThemedText>
-              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsNotifModalVisible(false)}>
-                <Text style={styles.notifCloseBtnText}>Kapat</Text>
+              <TouchableOpacity style={[styles.notifCloseBtn, { backgroundColor: theme.backgroundSelected }]} onPress={() => setIsNotifModalVisible(false)}>
+                <Text style={[styles.notifCloseBtnText, { color: theme.textSecondary }]}>Kapat</Text>
               </TouchableOpacity>
             </View>
 
@@ -1801,8 +1802,8 @@ export default function HomeScreen() {
           <View style={[styles.notifModalContent, { backgroundColor: theme.background, maxHeight: 320 }]}>
             <View style={styles.notifModalHeader}>
               <ThemedText type="subtitle" style={styles.notifModalTitle}>❌ Başvuru Red Nedeni</ThemedText>
-              <TouchableOpacity style={styles.notifCloseBtn} onPress={() => setIsRejectModalVisible(false)}>
-                <Text style={styles.notifCloseBtnText}>İptal</Text>
+              <TouchableOpacity style={[styles.notifCloseBtn, { backgroundColor: theme.backgroundSelected }]} onPress={() => setIsRejectModalVisible(false)}>
+                <Text style={[styles.notifCloseBtnText, { color: theme.textSecondary }]}>İptal</Text>
               </TouchableOpacity>
             </View>
 
@@ -2571,7 +2572,7 @@ const styles = StyleSheet.create({
   categoryMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(128, 128, 128, 0.15)',
     padding: 10,
     borderRadius: 10,
   },
@@ -2616,7 +2617,6 @@ const styles = StyleSheet.create({
   },
   mealValue: {
     fontSize: 14,
-    color: '#1C3A24',
     lineHeight: 18,
   },
   dietToggleBtn: {
@@ -2642,12 +2642,15 @@ const styles = StyleSheet.create({
     color: '#546E5A',
   },
   dietitianCreditsCard: {
-    flexDirection: 'row',
-    padding: Spacing.three,
+    padding: Spacing.four,
     borderRadius: 16,
+    gap: Spacing.three,
+    marginTop: Spacing.three,
+  },
+  creditsMainRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    marginTop: Spacing.one,
   },
   creditsEmoji: {
     fontSize: 32,
@@ -2656,18 +2659,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   creditsLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#81A588',
-    textTransform: 'uppercase',
     fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
   creditsName: {
     fontSize: 16,
     fontWeight: 'bold',
   },
   creditsLocation: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#546E5A',
+  },
+  creditsPhoto: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E0E0E0',
   },
 
   // Günlük Takip Kartı
@@ -2684,7 +2693,6 @@ const styles = StyleSheet.create({
   logSubLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#1C3A24',
   },
   logSubDesc: {
     fontSize: 11,
@@ -2764,7 +2772,6 @@ const styles = StyleSheet.create({
   complianceText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#1C3A24',
   },
   saveLogBtn: {
     height: 48,
@@ -2974,12 +2981,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   conditionalFields: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(128, 128, 128, 0.1)',
     padding: Spacing.three,
     borderRadius: 10,
     gap: Spacing.two,
     borderWidth: 1,
-    borderColor: '#E1EFE4',
+    borderColor: 'transparent',
   },
   saveBtn: {
     height: 52,
@@ -3140,44 +3147,6 @@ const styles = StyleSheet.create({
   secondaryActionBtnText: {
     fontWeight: 'bold',
     fontSize: 15,
-  },
-  dietitianCreditsCard: {
-    padding: Spacing.four,
-    borderRadius: 16,
-    gap: Spacing.three,
-    marginTop: Spacing.three,
-  },
-  creditsMainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  creditsEmoji: {
-    fontSize: 32,
-  },
-  creditsTextContainer: {
-    flex: 1,
-  },
-  creditsLabel: {
-    fontSize: 11,
-    color: '#81A588',
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-  creditsName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C3A24',
-  },
-  creditsLocation: {
-    fontSize: 13,
-    color: '#546E5A',
-  },
-  creditsPhoto: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E0E0E0',
   },
   socialRow: {
     flexDirection: 'row',

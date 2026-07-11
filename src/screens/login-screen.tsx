@@ -5,6 +5,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as Facebook from 'expo-auth-session/providers/facebook';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
 import axios from 'axios';
+import { useTheme } from '@/hooks/use-theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -14,6 +15,7 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { login, loginWithPassword, isLoading, showAlert } = useAuth();
+  const theme = useTheme();
   const [isMockMode, setIsMockMode] = useState(true); // Geliştirme kolaylığı için varsayılan true
 
   // Rol Seçim Aşaması
@@ -158,24 +160,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
 
         {roleSelection === 'NONE' && (
           <>
             {/* Logo Bölümü */}
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
+              <View style={[styles.logoCircle, { backgroundColor: theme.backgroundElement, shadowColor: theme.primary }]}>
                 <Text style={styles.logoLeaf}>🥗</Text>
               </View>
-              <Text style={styles.logoText}>DietApp</Text>
-              <Text style={styles.subtitle}>Diyetisyen ve Danışan Yönetim Platformu</Text>
+              <Text style={[styles.logoText, { color: theme.text }]}>DietApp</Text>
+              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Diyetisyen ve Danışan Yönetim Platformu</Text>
             </View>
 
-            <Text style={styles.roleSelectionTitle}>Lütfen giriş yapmak için rolünüzü seçin:</Text>
+            <Text style={[styles.roleSelectionTitle, { color: theme.text }]}>Lütfen giriş yapmak için rolünüzü seçin:</Text>
 
             <TouchableOpacity 
-              style={[styles.roleSelectBtn, { backgroundColor: '#2E7D32' }]} 
+              style={[styles.roleSelectBtn, { backgroundColor: theme.primary }]} 
               onPress={() => setRoleSelection('DIETITIAN')}
             >
               <Text style={styles.roleSelectEmoji}>👩‍⚕️</Text>
@@ -200,22 +202,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
         {roleSelection === 'DIETITIAN' && (
           <>
-            <TouchableOpacity style={styles.backBtn} onPress={() => setRoleSelection('NONE')}>
-              <Text style={styles.backBtnText}>◀ Geri Dön</Text>
+            <TouchableOpacity style={[styles.backBtn, { backgroundColor: theme.backgroundSelected }]} onPress={() => setRoleSelection('NONE')}>
+              <Text style={[styles.backBtnText, { color: theme.textSecondary }]}>◀ Geri Dön</Text>
             </TouchableOpacity>
 
             {/* Logo Bölümü */}
             <View style={styles.logoContainerSmall}>
-              <Text style={styles.logoTextSmall}>👩‍⚕️ Diyetisyen Portalı</Text>
+              <Text style={[styles.logoTextSmall, { color: theme.text }]}>👩‍⚕️ Diyetisyen Portalı</Text>
             </View>
 
             <View style={styles.formContainer}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>E-posta Adresi</Text>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>E-posta Adresi</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="diyetisyen@example.com"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   value={dietitianEmail}
@@ -224,11 +226,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Şifre</Text>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>Şifre</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="••••••••"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   secureTextEntry
                   value={dietitianPassword}
                   onChangeText={setDietitianPassword}
@@ -236,11 +238,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <TouchableOpacity style={styles.forgotBtn} onPress={handleForgotPassword}>
-                <Text style={styles.forgotBtnText}>Şifremi Unuttum</Text>
+                <Text style={[styles.forgotBtnText, { color: theme.primary }]}>Şifremi Unuttum</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.primaryActionBtn, { backgroundColor: '#2E7D32' }]} 
+                style={[styles.primaryActionBtn, { backgroundColor: theme.primary }]} 
                 onPress={handleDietitianLogin}
                 disabled={isLoggingInDietitian}
               >
@@ -258,15 +260,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <TouchableOpacity 
-                style={[styles.secondaryActionBtn, { borderColor: '#2E7D32', borderWidth: 1 }]} 
+                style={[styles.secondaryActionBtn, { borderColor: theme.primary, borderWidth: 1 }]} 
                 onPress={() => setIsApplyModalVisible(true)}
               >
-                <Text style={styles.secondaryActionBtnText}>📋 Diyetisyenliğe Başvur</Text>
+                <Text style={[styles.secondaryActionBtnText, { color: theme.primary }]}>📋 Diyetisyenliğe Başvur</Text>
               </TouchableOpacity>
 
               {isMockMode && (
                 <TouchableOpacity 
-                  style={[styles.secondaryActionBtn, { backgroundColor: '#E8F5E9', marginTop: 12, borderWidth: 1, borderColor: '#81C784' }]} 
+                  style={[styles.secondaryActionBtn, { backgroundColor: theme.backgroundSelected, marginTop: 12, borderWidth: 1, borderColor: theme.primary }]} 
                   onPress={async () => {
                     setDietitianEmail('suhedaterat2@gmail.com');
                     setDietitianPassword('admin123');
@@ -281,7 +283,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     }
                   }}
                 >
-                  <Text style={{ color: '#2E7D32', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>🔧 Geliştirici Modu: Admin Bilgileri ile Giriş Yap</Text>
+                  <Text style={{ color: theme.primary, fontWeight: 'bold', fontSize: 13, textAlign: 'center' }}>🔧 Geliştirici Modu: Admin Bilgileri ile Giriş Yap</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -290,14 +292,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
         {roleSelection === 'CLIENT' && (
           <>
-            <TouchableOpacity style={styles.backBtn} onPress={() => setRoleSelection('NONE')}>
-              <Text style={styles.backBtnText}>◀ Geri Dön</Text>
+            <TouchableOpacity style={[styles.backBtn, { backgroundColor: theme.backgroundSelected }]} onPress={() => setRoleSelection('NONE')}>
+              <Text style={[styles.backBtnText, { color: theme.textSecondary }]}>◀ Geri Dön</Text>
             </TouchableOpacity>
 
             {/* Logo Bölümü */}
             <View style={styles.logoContainerSmall}>
-              <Text style={styles.logoTextSmall}>👤 Danışan Portalı</Text>
-              <Text style={styles.logoSubtitleSmall}>Giriş yapmak veya yeni profil oluşturmak için sosyal hesap kullanın.</Text>
+              <Text style={[styles.logoTextSmall, { color: theme.text }]}>👤 Danışan Portalı</Text>
+              <Text style={[styles.logoSubtitleSmall, { color: theme.textSecondary }]}>Giriş yapmak veya yeni profil oluşturmak için sosyal hesap kullanın.</Text>
             </View>
 
             <View style={styles.buttonContainer}>
@@ -307,11 +309,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 <>
                   {/* Google Giriş Butonu */}
                   <TouchableOpacity
-                    style={[styles.button, styles.googleButton]}
+                    style={[styles.button, styles.googleButton, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}
                     onPress={() => isMockMode ? triggerMockLogin('google') : googlePromptAsync()}
                   >
                     <Text style={styles.googleIcon}>G</Text>
-                    <Text style={styles.buttonText}>{isMockMode ? "Google ile Giriş Yap (Mock Danışan)" : "Google ile Giriş Yap"}</Text>
+                    <Text style={[styles.buttonText, { color: theme.text }]}>{isMockMode ? "Google ile Giriş Yap (Mock Danışan)" : "Google ile Giriş Yap"}</Text>
                   </TouchableOpacity>
 
                   {/* Facebook Giriş Butonu */}
@@ -320,7 +322,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     onPress={() => isMockMode ? triggerMockLogin('facebook') : fbPromptAsync()}
                   >
                     <Text style={styles.fbIcon}>f</Text>
-                    <Text style={styles.buttonText}>{isMockMode ? "Facebook ile Giriş Yap (Mock Danışan)" : "Facebook ile Giriş Yap"}</Text>
+                    <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>{isMockMode ? "Facebook ile Giriş Yap (Mock Danışan)" : "Facebook ile Giriş Yap"}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -330,15 +332,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
         {/* Mock/Developer Modu Bilgilendirmesi */}
         {roleSelection === 'NONE' && (
-          <View style={[styles.mockModeContainer, { backgroundColor: '#E1EFE4', borderColor: '#C8E6C9', marginTop: 32 }]}>
-            <Text style={[styles.mockTitle, { color: '#1C3A24' }]}>🔧 Geliştirici Test Modu (Mock Login)</Text>
-            <Text style={[styles.mockDesc, { color: '#546E5A' }]}>
+          <View style={[styles.mockModeContainer, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected, marginTop: 32 }]}>
+            <Text style={[styles.mockTitle, { color: theme.text }]}>🔧 Geliştirici Test Modu (Mock Login)</Text>
+            <Text style={[styles.mockDesc, { color: theme.textSecondary }]}>
               Açık olduğunda, gerçek Google/Facebook hesap API kurulumlarına gerek olmadan doğrudan test hesapları ile sisteme giriş yapabilirsiniz.
             </Text>
             <View style={styles.toggleRow}>
-              <Text style={[styles.toggleLabel, { color: '#1C3A24' }]}>Geliştirici Modu:</Text>
+              <Text style={[styles.toggleLabel, { color: theme.text }]}>Geliştirici Modu:</Text>
               <TouchableOpacity
-                style={[styles.toggleBtn, isMockMode ? styles.toggleOn : styles.toggleOff]}
+                style={[styles.toggleBtn, isMockMode ? styles.toggleOn : styles.toggleOff, isMockMode ? { backgroundColor: theme.primary } : {}]}
                 onPress={() => setIsMockMode(!isMockMode)}
               >
                 <Text style={styles.toggleText}>{isMockMode ? "AÇIK" : "KAPALI"}</Text>
@@ -357,31 +359,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         onRequestClose={() => setIsApplyModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Diyetisyen Başvuru Formu 🥗</Text>
-            <Text style={styles.modalSubtitle}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+            <Text style={[styles.modalTitle, { color: theme.primary }]}>Diyetisyen Başvuru Formu 🥗</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
               Sisteme diyetisyen olarak katılmak için lütfen aşağıdaki bilgileri eksiksiz doldurun.
             </Text>
             
             <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Ad Soyad *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Ad Soyad *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: Şüheda Terat"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   value={applyName}
                   onChangeText={setApplyName}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>E-posta *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>E-posta *</Text>
                 <Text style={styles.helperText}>Önemli: Başvurunuz onaylandıktan sonra giriş yaparken kullanacağınız e-posta adresidir.</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="name@example.com"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={applyEmail}
@@ -390,11 +392,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Giriş Şifresi *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Giriş Şifresi *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Giriş için kullanacağınız şifre"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   secureTextEntry
                   value={applyPassword}
                   onChangeText={setApplyPassword}
@@ -402,33 +404,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Mezun Olunan Üniversite *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Mezun Olunan Üniversite *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: Hacettepe Üniversitesi"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   value={applyUniversity}
                   onChangeText={setApplyUniversity}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Diploma Numarası *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Diploma Numarası *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: D-12345"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   value={applyDiploma}
                   onChangeText={setApplyDiploma}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Deneyim Yılı *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Deneyim Yılı *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: 5"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
                   value={applyExperience}
                   onChangeText={setApplyExperience}
@@ -436,11 +438,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Özgeçmiş / Belge Linki</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Özgeçmiş / Belge Linki</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="LinkedIn veya PDF indirme linki"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   value={applyDocUrl}
                   onChangeText={setApplyDocUrl}
@@ -448,11 +450,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Başvuru Notu / Motivasyon</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Başvuru Notu / Motivasyon</Text>
                 <TextInput
-                  style={[styles.modalInput, styles.textArea]}
+                  style={[styles.modalInput, styles.textArea, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Kendinizi ve uzmanlıklarınızı tanıtan kısa bir not..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   multiline={true}
                   numberOfLines={4}
                   value={applyNote}
@@ -463,15 +465,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.cancelBtn]}
+                style={[styles.modalBtn, styles.cancelBtn, { backgroundColor: theme.backgroundSelected, borderColor: theme.backgroundSelected }]}
                 onPress={() => setIsApplyModalVisible(false)}
                 disabled={isApplying}
               >
-                <Text style={styles.cancelBtnText}>İptal</Text>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>İptal</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                style={[styles.modalBtn, styles.modalSubmitBtn, { backgroundColor: theme.primary }]}
                 onPress={handleApplySubmit}
                 disabled={isApplying}
               >
@@ -875,5 +877,9 @@ const styles = StyleSheet.create({
   inputGroup: {
     width: '100%',
     gap: 6,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

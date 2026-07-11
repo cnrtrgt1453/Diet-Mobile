@@ -13,9 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
+import { useTheme } from '@/hooks/use-theme';
 
 export const ApplicationStatusScreen: React.FC = () => {
   const { userInfo, logout, refreshUserInfo, showAlert } = useAuth();
+  const theme = useTheme();
   
   const [isApplyModalVisible, setIsApplyModalVisible] = useState(false);
   const [applyName, setApplyName] = useState(userInfo?.name || '');
@@ -66,27 +68,27 @@ export const ApplicationStatusScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
         
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.logoLeaf}>🥗</Text>
-          <Text style={styles.title}>Başvuru Durumu</Text>
+          <Text style={[styles.title, { color: theme.primary }]}>DietApp</Text>
         </View>
 
         {/* Status Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
           {status === 'PENDING' ? (
             <View style={styles.statusWrapper}>
               <View style={[styles.statusIconCircle, styles.pendingCircle]}>
                 <Text style={styles.statusIcon}>⏳</Text>
               </View>
-              <Text style={[styles.statusTitle, styles.pendingText]}>Başvurunuz İncelemede</Text>
-              <Text style={styles.statusDescription}>
+              <Text style={[styles.statusTitle, styles.pendingText, { color: '#FFB300' }]}>Başvurunuz İncelemede</Text>
+              <Text style={[styles.statusDescription, { color: theme.text }]}>
                 Diyetisyenlik başvurunuz başarıyla alındı. Yönetici diyetisyenimiz diploma numaranızı ve mezuniyet bilgilerinizi inceledikten sonra hesabınız aktif edilecektir.
               </Text>
-              <Text style={styles.infoNote}>
+              <Text style={[styles.infoNote, { backgroundColor: theme.background, color: theme.textSecondary }]}>
                 İşlem tamamlandığında bir sonraki girişinizde paneliniz otomatik olarak açılacaktır. Lütfen aralıklarla kontrol ediniz.
               </Text>
             </View>
@@ -95,20 +97,20 @@ export const ApplicationStatusScreen: React.FC = () => {
               <View style={[styles.statusIconCircle, styles.rejectedCircle]}>
                 <Text style={styles.statusIcon}>❌</Text>
               </View>
-              <Text style={[styles.statusTitle, styles.rejectedText]}>Başvurunuz Reddedildi</Text>
-              <Text style={styles.statusDescription}>
+              <Text style={[styles.statusTitle, styles.rejectedText, { color: '#D32F2F' }]}>Başvurunuz Reddedildi</Text>
+              <Text style={[styles.statusDescription, { color: theme.text }]}>
                 Girdiğiniz bilgiler doğrulanamadığı için diyetisyenlik başvurunuz reddedilmiştir.
               </Text>
               
               {reason ? (
-                <View style={styles.reasonBox}>
-                  <Text style={styles.reasonTitle}>Reddedilme Nedeni:</Text>
-                  <Text style={styles.reasonText}>{reason}</Text>
+                <View style={[styles.reasonBox, { backgroundColor: 'rgba(211, 47, 47, 0.15)', borderColor: 'rgba(211, 47, 47, 0.3)' }]}>
+                  <Text style={[styles.reasonTitle, { color: '#FF8A80' }]}>Reddedilme Nedeni:</Text>
+                  <Text style={[styles.reasonText, { color: theme.text }]}>{reason}</Text>
                 </View>
               ) : null}
 
               <TouchableOpacity
-                style={styles.reapplyBtn}
+                style={[styles.reapplyBtn, { backgroundColor: theme.primary }]}
                 onPress={() => setIsApplyModalVisible(true)}
               >
                 <Text style={styles.reapplyBtnText}>Bilgileri Güncelle ve Yeniden Başvur</Text>
@@ -117,8 +119,8 @@ export const ApplicationStatusScreen: React.FC = () => {
           )}
 
           {/* Refresh button */}
-          <TouchableOpacity style={styles.refreshBtn} onPress={refreshUserInfo}>
-            <Text style={styles.refreshBtnText}>🔄 Durumu Güncelle</Text>
+          <TouchableOpacity style={[styles.refreshBtn, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]} onPress={refreshUserInfo}>
+            <Text style={[styles.refreshBtnText, { color: theme.text }]}>🔄 Durumu Güncelle</Text>
           </TouchableOpacity>
 
           {/* Logout button */}
@@ -136,61 +138,61 @@ export const ApplicationStatusScreen: React.FC = () => {
         onRequestClose={() => setIsApplyModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Bilgileri Güncelle 🥗</Text>
-            <Text style={styles.modalSubtitle}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+            <Text style={[styles.modalTitle, { color: theme.primary }]}>Bilgileri Güncelle 🥗</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
               Başvurunuzu düzeltmek için lütfen aşağıdaki alanları güncelleyip tekrar gönderin.
             </Text>
             
             <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Ad Soyad *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Ad Soyad *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Ad Soyad"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   value={applyName}
                   onChangeText={setApplyName}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>E-posta *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>E-posta *</Text>
                 <TextInput
-                  style={[styles.modalInput, styles.disabledInput]}
+                  style={[styles.modalInput, styles.disabledInput, { backgroundColor: theme.backgroundSelected, color: theme.textSecondary, borderColor: theme.backgroundSelected }]}
                   editable={false}
                   value={applyEmail}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Mezun Olunan Üniversite *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Mezun Olunan Üniversite *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: Hacettepe Üniversitesi"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   value={applyUniversity}
                   onChangeText={setApplyUniversity}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Diploma Numarası *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Diploma Numarası *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: D-12345"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   value={applyDiploma}
                   onChangeText={setApplyDiploma}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Deneyim Yılı *</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Deneyim Yılı *</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Örn: 5"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
                   value={applyExperience}
                   onChangeText={setApplyExperience}
@@ -198,11 +200,11 @@ export const ApplicationStatusScreen: React.FC = () => {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Özgeçmiş / Belge Linki</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Özgeçmiş / Belge Linki</Text>
                 <TextInput
-                  style={styles.modalInput}
+                  style={[styles.modalInput, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="LinkedIn veya PDF indirme linki"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
                   value={applyDocUrl}
                   onChangeText={setApplyDocUrl}
@@ -210,11 +212,11 @@ export const ApplicationStatusScreen: React.FC = () => {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Başvuru Notu / Motivasyon</Text>
+                <Text style={[styles.modalLabel, { color: theme.text }]}>Başvuru Notu / Motivasyon</Text>
                 <TextInput
-                  style={[styles.modalInput, styles.textArea]}
+                  style={[styles.modalInput, styles.textArea, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
                   placeholder="Eklemek istediğiniz notlar..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.textSecondary}
                   multiline={true}
                   numberOfLines={4}
                   value={applyNote}
@@ -225,15 +227,15 @@ export const ApplicationStatusScreen: React.FC = () => {
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.cancelBtn]}
+                style={[styles.modalBtn, styles.cancelBtn, { backgroundColor: theme.backgroundSelected, borderColor: theme.backgroundSelected }]}
                 onPress={() => setIsApplyModalVisible(false)}
                 disabled={isApplying}
               >
-                <Text style={styles.cancelBtnText}>İptal</Text>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>İptal</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                style={[styles.modalBtn, styles.modalSubmitBtn, { backgroundColor: theme.primary }]}
                 onPress={handleApplySubmit}
                 disabled={isApplying}
               >
