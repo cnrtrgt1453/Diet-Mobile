@@ -13,6 +13,7 @@ import { LineChart, BarChart } from 'react-native-gifted-charts';
 export default function ExploreScreen() {
   const { userInfo, userToken } = useAuth();
   const theme = useTheme();
+  const isDietitian = userInfo?.role === 'ROLE_DIETITIAN';
 
   const [refreshing, setRefreshing] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
@@ -50,6 +51,11 @@ export default function ExploreScreen() {
   const [dFat, setDFat] = useState('');
   const [dDate, setDDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
+  // Şablon Kütüphanesi State'leri
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState('');
+
   // Danışan Modu (ROLE_USER) State'leri
   const [myMeasurements, setMyMeasurements] = useState<any[]>([]);
   const [myDiets, setMyDiets] = useState<any[]>([]);
@@ -77,6 +83,24 @@ export default function ExploreScreen() {
       console.error("Failed to load chat history:", e);
     }
   }, [userToken, chatWithUser]);
+
+  const loadTemplates = useCallback(async () => {
+    if (!userToken) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/diet-templates`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      setTemplates(res.data);
+    } catch (e) {
+      console.error("Failed to load templates:", e);
+    }
+  }, [userToken]);
+
+  useEffect(() => {
+    if (isDietPlanModalVisible && isDietitian) {
+      loadTemplates();
+    }
+  }, [isDietPlanModalVisible, isDietitian, loadTemplates]);
 
   useEffect(() => {
     if (!isChatModalVisible || !chatWithUser || !userToken) {
@@ -226,7 +250,6 @@ export default function ExploreScreen() {
 
   const trendVal = chartData.length > 1 ? chartData[chartData.length - 1].value - chartData[0].value : 0;
 
-  const isDietitian = userInfo?.role === 'ROLE_DIETITIAN';
 
   const loadData = useCallback(async () => {
     if (!userToken) return;
@@ -374,6 +397,16 @@ export default function ExploreScreen() {
         headers: { Authorization: `Bearer ${userToken}` }
       });
 
+      if (saveAsTemplate && templateTitle.trim()) {
+        try {
+          await axios.post(`${API_BASE_URL}/api/v1/diet-templates/from-plan/${res.data.id}?title=${encodeURIComponent(templateTitle.trim())}`, {}, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+        } catch (templateError) {
+          console.error("Şablon kaydedilemedi:", templateError);
+        }
+      }
+
       Alert.alert("Başarılı", "Diyet programı başarıyla atandı.");
       setClientDiets([res.data, ...clientDiets]);
 
@@ -388,6 +421,8 @@ export default function ExploreScreen() {
       setDCarbs('');
       setDFat('');
       setDDate(new Date().toISOString().split('T')[0]);
+      setSaveAsTemplate(false);
+      setTemplateTitle('');
       setIsDietPlanModalVisible(false);
     } catch (e) {
       Alert.alert("Hata", "Diyet planı kaydedilemedi.");
@@ -1001,6 +1036,40 @@ export default function ExploreScreen() {
             </View>
 
             <View style={styles.modalForm}>
+              {templates.length > 0 && (
+                <View style={{ marginBottom: 12 }}>
+                  <ThemedText style={styles.inputLabel}>Şablon Kütüphanesinden Doldur</ThemedText>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4, flexDirection: 'row' }}>
+                    {templates.map((tpl) => (
+                      <TouchableOpacity
+                        key={tpl.id}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: theme.backgroundSelected,
+                          borderWidth: 1,
+                          borderColor: theme.primary
+                        }}
+                        onPress={() => {
+                          setDTitle(tpl.title);
+                          setDBreakfast(tpl.breakfast || '');
+                          setDLunch(tpl.lunch || '');
+                          setDDinner(tpl.dinner || '');
+                          setDSnacks(tpl.snacks || '');
+                          setDCalories(tpl.targetCalories?.toString() || '');
+                          setDProtein(tpl.targetProteinGrams?.toString() || '');
+                          setDCarbs(tpl.targetCarbsGrams?.toString() || '');
+                          setDFat(tpl.targetFatGrams?.toString() || '');
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: theme.primary, fontWeight: 'bold' }}>{tpl.title}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
               <ThemedText style={styles.inputLabel}>Diyet Günü Başlığı</ThemedText>
               <TextInput 
                 style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
@@ -1098,6 +1167,26 @@ export default function ExploreScreen() {
                 value={dSnacks}
                 onChangeText={setDSnacks}
               />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12 }}>
+                <TouchableOpacity 
+                  style={[{ width: 22, height: 22, borderWidth: 1.5, borderColor: theme.primary, borderRadius: 6, marginRight: 8, alignItems: 'center', justifyContent: 'center' }, saveAsTemplate ? { backgroundColor: theme.primary } : {}]}
+                  onPress={() => setSaveAsTemplate(!saveAsTemplate)}
+                >
+                  {saveAsTemplate && <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+                </TouchableOpacity>
+                <ThemedText style={{ fontSize: 13 }}>Bu planı şablon kütüphaneme kaydet</ThemedText>
+              </View>
+
+              {saveAsTemplate && (
+                <TextInput 
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                  placeholder="Şablon Başlığı (örn: PCOS 1400 Kcal Şablonu)"
+                  placeholderTextColor={theme.textSecondary}
+                  value={templateTitle}
+                  onChangeText={setTemplateTitle}
+                />
+              )}
 
               <TouchableOpacity 
                 style={[styles.saveBtn, { backgroundColor: theme.primary }]}

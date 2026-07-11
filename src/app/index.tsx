@@ -34,6 +34,15 @@ export default function HomeScreen() {
   const [appTime, setAppTime] = useState('');
   const [appNote, setAppNote] = useState('');
 
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+
+  // Diyetisyen Slot Tanımlama State'leri
+  const [isSlotModalVisible, setIsSlotModalVisible] = useState(false);
+  const [slotDate, setSlotDate] = useState(new Date().toISOString().split('T')[0]);
+  const [slotStartTime, setSlotStartTime] = useState('');
+  const [slotEndTime, setSlotEndTime] = useState('');
+
   // Admin Diyetisyen Başvuru State'leri
   const [applications, setApplications] = useState<any[]>([]);
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
@@ -623,28 +632,85 @@ export default function HomeScreen() {
     }
   };
 
-  // Randevu Talebi Gönder
-  const handleRequestAppointment = async () => {
-    if (!appDate || !appTime) {
-      Alert.alert("Hata", "Lütfen randevu tarihi ve saatini doldurunuz.");
+  // Randevu slotlarını çekme
+  const fetchAvailableSlots = useCallback(async (dateStr: string) => {
+    if (!userInfo?.dietitian?.id || !userToken) return;
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/v1/appointments/availability/dietitian/${userInfo.dietitian.id}?date=${dateStr}`,
+        { headers: { Authorization: `Bearer ${userToken}` } }
+      );
+      setAvailableSlots(res.data);
+      setSelectedSlotId(null);
+    } catch (e) {
+      console.error("Failed to load available slots:", e);
+      setAvailableSlots([]);
+    }
+  }, [userInfo, userToken]);
+
+  useEffect(() => {
+    if (!isDietitian && isAppModalVisible && appDate) {
+      fetchAvailableSlots(appDate);
+    }
+  }, [appDate, isAppModalVisible, isDietitian, fetchAvailableSlots]);
+
+  // Yeni Çalışma Saat Slotu Ekle (Diyetisyen)
+  const handleAddSlot = async () => {
+    if (!slotDate || !slotStartTime || !slotEndTime) {
+      Alert.alert("Hata", "Lütfen tarih, başlangıç saati ve bitiş saati giriniz.");
       return;
     }
     try {
       const payload = {
-        appointmentDate: appDate,
-        appointmentTime: appTime,
-        note: appNote
+        date: slotDate,
+        startTime: slotStartTime,
+        endTime: slotEndTime
       };
-      await axios.post(`${API_BASE_URL}/api/v1/appointments`, payload, {
+      await axios.post(`${API_BASE_URL}/api/v1/appointments/availability`, payload, {
         headers: { Authorization: `Bearer ${userToken}` }
       });
-      Alert.alert("Başarılı", "Randevu talebiniz diyetisyeninize iletildi.");
+      Alert.alert("Başarılı", "Çalışma saat slotu başarıyla eklendi.");
+      setIsSlotModalVisible(false);
+      setSlotStartTime('');
+      setSlotEndTime('');
+      loadData();
+    } catch (e: any) {
+      Alert.alert("Hata", e.response?.data || "Slot oluşturulamadı.");
+    }
+  };
+
+  // Randevu Talebi Gönder (Slot Üzerinden Rezervasyon)
+  const handleRequestAppointment = async () => {
+    if (!selectedSlotId) {
+      Alert.alert("Hata", "Lütfen listeden boş bir randevu saati seçiniz.");
+      return;
+    }
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/appointments/book-slot/${selectedSlotId}`, {
+        note: appNote
+      }, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Randevunuz başarıyla rezerve edildi ve onaylandı! 🎉");
       setIsAppModalVisible(false);
-      setAppTime('');
+      setSelectedSlotId(null);
       setAppNote('');
       loadData();
     } catch (e: any) {
-      Alert.alert("Hata", e.response?.data || "Randevu talebi oluşturulamadı.");
+      Alert.alert("Hata", e.response?.data || "Randevu rezerve edilemedi.");
+    }
+  };
+
+  // Diyetisyen Başvurusunu İncelemeye Al (Admin)
+  const handleStartReviewApplication = async (id: number) => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/admin/applications/${id}/start-review`, {}, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      Alert.alert("Başarılı", "Başvuru inceleme sürecine alındı.");
+      loadData();
+    } catch (err: any) {
+      Alert.alert("Hata", err.response?.data || "İncelemeye alınamadı.");
     }
   };
 
@@ -979,6 +1045,13 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity 
+              style={[styles.primaryActionBtn, { backgroundColor: theme.primary, marginTop: 10 }]}
+              onPress={() => setIsSlotModalVisible(true)}
+            >
+              <ThemedText style={styles.primaryActionBtnText}>➕ Çalışma Saati Slotu Ekle</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={[styles.primaryActionBtn, { backgroundColor: '#FF9800', marginTop: 10 }]}
               onPress={() => setIsBroadcastModalVisible(true)}
             >
@@ -1053,22 +1126,39 @@ export default function HomeScreen() {
                       {app.documentUrl ? <ThemedText style={styles.appNote}>Belge/Link: {app.documentUrl}</ThemedText> : null}
                       {app.note ? <ThemedText style={styles.appNote}>Ön Yazı: "{app.note}"</ThemedText> : null}
                       
+                      <View style={{ marginVertical: 6 }}>
+                        <ThemedText style={{ fontSize: 12, color: theme.textSecondary }}>
+                          Başvuru Durumu: <ThemedText style={{ fontWeight: 'bold', color: app.status === 'PENDING' ? '#EF6C00' : '#512DA8' }}>{app.status === 'PENDING' ? '⏳ Onay Bekliyor' : '🔎 İnceleme Sürecinde'}</ThemedText>
+                        </ThemedText>
+                      </View>
+
                       <View style={styles.appActionRow}>
-                        <TouchableOpacity 
-                          style={[styles.appBtn, styles.appRejectBtn]}
-                          onPress={() => {
-                            setSelectedApplication(app);
-                            setIsRejectModalVisible(true);
-                          }}
-                        >
-                          <ThemedText style={styles.appRejectText}>Reddet</ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.appBtn, { backgroundColor: theme.primary }]}
-                          onPress={() => handleApproveApplication(app.id)}
-                        >
-                          <ThemedText style={styles.appApproveText}>Onayla</ThemedText>
-                        </TouchableOpacity>
+                        {app.status === 'PENDING' ? (
+                          <TouchableOpacity 
+                            style={[styles.appBtn, { backgroundColor: theme.primary, flex: 1, paddingVertical: 10 }]}
+                            onPress={() => handleStartReviewApplication(app.id)}
+                          >
+                            <ThemedText style={[styles.appApproveText, { textAlign: 'center' }]}>🔎 Başvuruyu İncelemeye Al</ThemedText>
+                          </TouchableOpacity>
+                        ) : (
+                          <>
+                            <TouchableOpacity 
+                              style={[styles.appBtn, styles.appRejectBtn]}
+                              onPress={() => {
+                                setSelectedApplication(app);
+                                setIsRejectModalVisible(true);
+                              }}
+                            >
+                              <ThemedText style={styles.appRejectText}>Reddet</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={[styles.appBtn, { backgroundColor: theme.primary }]}
+                              onPress={() => handleApproveApplication(app.id)}
+                            >
+                              <ThemedText style={styles.appApproveText}>Onayla</ThemedText>
+                            </TouchableOpacity>
+                          </>
+                        )}
                       </View>
                     </View>
                   ))
@@ -1709,16 +1799,16 @@ export default function HomeScreen() {
         onRequestClose={() => setIsAppModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '60%' }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '80%' }]}>
             
             <View style={styles.modalHeader}>
-              <ThemedText type="subtitle">🗓 Randevu Talebi</ThemedText>
+              <ThemedText type="subtitle">🗓 Seans Rezervasyonu</ThemedText>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsAppModalVisible(false)}>
                 <ThemedText style={styles.modalCloseBtnText}>İptal</ThemedText>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalForm}>
+            <ScrollView style={{ padding: 16 }} contentContainerStyle={{ gap: 8, paddingBottom: 30 }}>
               <ThemedText style={styles.inputLabel}>Randevu Tarihi (YYYY-MM-DD)</ThemedText>
               <TextInput 
                 style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
@@ -1726,19 +1816,43 @@ export default function HomeScreen() {
                 onChangeText={setAppDate}
               />
 
-              <ThemedText style={styles.inputLabel}>Randevu Saati (HH:MM)</ThemedText>
-              <TextInput 
-                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
-                placeholder="Örn: 14:30"
-                placeholderTextColor={theme.textSecondary}
-                value={appTime}
-                onChangeText={setAppTime}
-              />
+              <ThemedText style={styles.inputLabel}>Uygun Saat Slotları</ThemedText>
+              {availableSlots.length > 0 ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 6 }}>
+                  {availableSlots.map((slot) => {
+                    const isSelected = selectedSlotId === slot.id;
+                    return (
+                      <TouchableOpacity
+                        key={slot.id}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: isSelected ? theme.primary : theme.backgroundSelected,
+                          borderWidth: 1,
+                          borderColor: theme.primary,
+                          minWidth: 70,
+                          alignItems: 'center'
+                        }}
+                        onPress={() => setSelectedSlotId(slot.id)}
+                      >
+                        <Text style={{ fontSize: 12, color: isSelected ? '#FFFFFF' : theme.primary, fontWeight: 'bold' }}>
+                          {slot.startTime} - {slot.endTime}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: '#C62828', fontStyle: 'italic', marginVertical: 6 }}>
+                  ⚠️ Diyetisyeninizin bu tarihte açık randevu slotu bulunmuyor. Farklı bir gün girmeyi deneyin.
+                </Text>
+              )}
 
               <ThemedText style={styles.inputLabel}>Diyetisyeninize Not</ThemedText>
               <TextInput 
                 style={[styles.textInput, styles.textArea, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
-                placeholder="Randevu sebebi veya sormak istediğiniz sorular..."
+                placeholder="Örn: Kan tahlili sonuçlarımı göstereceğim."
                 placeholderTextColor={theme.textSecondary}
                 multiline={true}
                 value={appNote}
@@ -1746,12 +1860,12 @@ export default function HomeScreen() {
               />
 
               <TouchableOpacity 
-                style={[styles.saveBtn, { backgroundColor: theme.primary }]}
+                style={[styles.saveBtn, { backgroundColor: theme.primary, marginTop: 12 }]}
                 onPress={handleRequestAppointment}
               >
-                <ThemedText style={styles.saveBtnText}>Talebi Gönder</ThemedText>
+                <ThemedText style={styles.saveBtnText}>Rezervasyon Yap</ThemedText>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
           </View>
         </View>
@@ -1940,6 +2054,67 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* ========================================================
+         ÇALIŞMA SAATİ SLOTU EKLEME MODALI (DIETITIAN ONLY)
+         ======================================================== */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isSlotModalVisible}
+        onRequestClose={() => setIsSlotModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '60%' }]}>
+            
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">➕ Çalışma Saati Slotu Ekle</ThemedText>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsSlotModalVisible(false)}>
+                <ThemedText style={styles.modalCloseBtnText}>Kapat</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalForm}>
+              <ThemedText style={styles.inputLabel}>Tarih (YYYY-MM-DD)</ThemedText>
+              <TextInput 
+                style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                value={slotDate}
+                onChangeText={setSlotDate}
+              />
+
+              <View style={styles.inputRow}>
+                <View style={styles.inputRowCol}>
+                  <ThemedText style={styles.inputLabel}>Başlangıç Saati (örn: 09:30)</ThemedText>
+                  <TextInput 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                    placeholder="09:30"
+                    placeholderTextColor={theme.textSecondary}
+                    value={slotStartTime}
+                    onChangeText={setSlotStartTime}
+                  />
+                </View>
+                <View style={styles.inputRowCol}>
+                  <ThemedText style={styles.inputLabel}>Bitiş Saati (örn: 10:00)</ThemedText>
+                  <TextInput 
+                    style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]} 
+                    placeholder="10:00"
+                    placeholderTextColor={theme.textSecondary}
+                    value={slotEndTime}
+                    onChangeText={setSlotEndTime}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.saveBtn, { backgroundColor: theme.primary, marginTop: 10 }]}
+                onPress={handleAddSlot}
+              >
+                <ThemedText style={styles.saveBtnText}>Slotu Kaydet ve Aç</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* BİLDİRİM MODALI */}
       <Modal
         visible={isNotifModalVisible}
@@ -2060,10 +2235,10 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Ad Soyad *</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Ad Soyad *</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="Örn: Şüheda Terat"
                   placeholderTextColor={theme.textSecondary}
                   value={editName}
@@ -2071,10 +2246,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Klinik / Adres / Biyografi</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Klinik / Adres / Biyografi</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="Örn: İzmir / Alsancak Kliniği"
                   placeholderTextColor={theme.textSecondary}
                   value={editNotes}
@@ -2082,10 +2257,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Instagram Profil Linki</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Instagram Profil Linki</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="https://instagram.com/kullaniciadi"
                   placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
@@ -2094,10 +2269,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>LinkedIn Profil Linki</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>LinkedIn Profil Linki</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="https://linkedin.com/in/kullaniciadi"
                   placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
@@ -2106,10 +2281,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={[styles.modalLabel, { color: theme.text }]}>YouTube Profil Linki</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>YouTube Profil Linki</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="https://youtube.com/@kanaladi"
                   placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
@@ -2118,10 +2293,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Profil Fotoğrafı Linki</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Profil Fotoğrafı Linki</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="https://example.com/resim.jpg"
                   placeholderTextColor={theme.textSecondary}
                   autoCapitalize="none"
@@ -2131,24 +2306,24 @@ export default function HomeScreen() {
               </View>
             </ScrollView>
 
-            <View style={styles.modalActions}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.cancelBtn]}
+                style={[{ flex: 1, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, { backgroundColor: theme.backgroundSelected }]}
                 onPress={() => setIsEditProfileModalVisible(false)}
                 disabled={isSavingProfile}
               >
-                <Text style={styles.cancelBtnText}>İptal</Text>
+                <Text style={{ color: theme.textSecondary, fontWeight: 'bold' }}>İptal</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                style={[{ flex: 1, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, { backgroundColor: theme.primary }]}
                 onPress={handleSaveProfile}
                 disabled={isSavingProfile}
               >
                 {isSavingProfile ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.modalSubmitBtnText}>Kaydet</Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Kaydet</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2173,10 +2348,10 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Ad Soyad *</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Ad Soyad *</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="Adınız Soyadınız"
                   placeholderTextColor={theme.textSecondary}
                   value={clientEditName}
@@ -2184,10 +2359,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Boy (cm) *</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Boy (cm) *</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="Örn: 165"
                   placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
@@ -2196,10 +2371,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Mevcut Kilo (kg) *</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Mevcut Kilo (kg) *</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="Örn: 75.5"
                   placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
@@ -2208,10 +2383,10 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Hedef Kilo (kg) *</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Hedef Kilo (kg) *</Text>
                 <TextInput
-                  style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                  style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                   placeholder="Örn: 65.0"
                   placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
@@ -2220,8 +2395,8 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Takip Programı Kategorisi *</Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Takip Programı Kategorisi *</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6 }}>
                   {[
                     { id: 'WEIGHT_MANAGEMENT', label: 'Kilo' },
@@ -2254,12 +2429,12 @@ export default function HomeScreen() {
 
               {clientEditCategory === 'GLP_1' && (
                 <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEEEE' }}>
-                  <Text style={[styles.modalLabel, { color: theme.primary, fontWeight: 'bold' }]}>💉 GLP-1 Takip Detayları</Text>
+                  <Text style={[styles.inputLabel, { color: theme.primary, fontWeight: 'bold' }]}>💉 GLP-1 Takip Detayları</Text>
                   
-                  <View style={styles.modalInputGroup}>
-                    <Text style={styles.modalLabel}>Enjeksiyon Günü</Text>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.inputLabel}>Enjeksiyon Günü</Text>
                     <TextInput
-                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                       placeholder="Pazartesi"
                       placeholderTextColor={theme.textSecondary}
                       value={clientEditGlp1Day}
@@ -2267,10 +2442,10 @@ export default function HomeScreen() {
                     />
                   </View>
 
-                  <View style={styles.modalInputGroup}>
-                    <Text style={styles.modalLabel}>Dozaj</Text>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.inputLabel}>Dozaj</Text>
                     <TextInput
-                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                       placeholder="0.25 mg"
                       placeholderTextColor={theme.textSecondary}
                       value={clientEditGlp1Dosage}
@@ -2282,12 +2457,12 @@ export default function HomeScreen() {
 
               {clientEditCategory === 'LIPEDEMA' && (
                 <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEEEE' }}>
-                  <Text style={[styles.modalLabel, { color: theme.primary, fontWeight: 'bold' }]}>🦵 Lipödem Takip Detayları</Text>
+                  <Text style={[styles.inputLabel, { color: theme.primary, fontWeight: 'bold' }]}>🦵 Lipödem Takip Detayları</Text>
                   
-                  <View style={styles.modalInputGroup}>
-                    <Text style={styles.modalLabel}>Lipödem Evresi (1-2-3-4)</Text>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.inputLabel}>Lipödem Evresi (1-2-3-4)</Text>
                     <TextInput
-                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                       placeholder="Örn: 2"
                       placeholderTextColor={theme.textSecondary}
                       keyboardType="numeric"
@@ -2297,7 +2472,7 @@ export default function HomeScreen() {
                   </View>
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 10 }}>
-                    <Text style={styles.modalLabel}>Anti-inflamatuar Diyet</Text>
+                    <Text style={styles.inputLabel}>Anti-inflamatuar Diyet</Text>
                     <TouchableOpacity
                       style={{
                         paddingHorizontal: 12,
@@ -2317,12 +2492,12 @@ export default function HomeScreen() {
 
               {clientEditCategory === 'HORMONAL_BALANCE' && (
                 <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEEEEE' }}>
-                  <Text style={[styles.modalLabel, { color: theme.primary, fontWeight: 'bold' }]}>🧬 Hormonal Denge Detayları</Text>
+                  <Text style={[styles.inputLabel, { color: theme.primary, fontWeight: 'bold' }]}>🧬 Hormonal Denge Detayları</Text>
                   
-                  <View style={styles.modalInputGroup}>
-                    <Text style={styles.modalLabel}>Hedef Döngü / Faz</Text>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.inputLabel}>Hedef Döngü / Faz</Text>
                     <TextInput
-                      style={[styles.modalInput, { borderColor: theme.backgroundSelected, color: theme.text }]}
+                      style={[styles.textInput, { borderColor: theme.backgroundSelected, color: theme.text, backgroundColor: theme.backgroundElement }]}
                       placeholder="Foliküler Faz"
                       placeholderTextColor={theme.textSecondary}
                       value={clientEditHormoneCycle}
@@ -2333,24 +2508,24 @@ export default function HomeScreen() {
               )}
             </ScrollView>
 
-            <View style={styles.modalActions}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.cancelBtn]}
+                style={[{ flex: 1, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, { backgroundColor: theme.backgroundSelected }]}
                 onPress={() => setIsClientEditModalVisible(false)}
                 disabled={isSavingClientProfile}
               >
-                <Text style={styles.cancelBtnText}>İptal</Text>
+                <Text style={{ color: theme.textSecondary, fontWeight: 'bold' }}>İptal</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                style={[{ flex: 1, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, { backgroundColor: theme.primary }]}
                 onPress={handleSaveClientProfile}
                 disabled={isSavingClientProfile}
               >
                 {isSavingClientProfile ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.modalSubmitBtnText}>Kaydet</Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Kaydet</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -3307,7 +3482,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
   },
   notifEmpty: {
-    paddingVertical: Spacing.eight,
+    paddingVertical: Spacing.six,
     alignItems: 'center',
     justifyContent: 'center',
   },
