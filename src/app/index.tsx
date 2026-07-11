@@ -9,6 +9,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth, API_BASE_URL } from '../context/auth-context';
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotificationsAsync } from '../services/notification-service';
 
 export default function HomeScreen() {
   const { userInfo, userToken, logout, showAlert, refreshUserInfo } = useAuth();
@@ -497,6 +499,32 @@ export default function HomeScreen() {
     loadNotifications();
     const interval = setInterval(loadNotifications, 15000);
     return () => clearInterval(interval);
+  }, [userToken, loadNotifications]);
+
+  // Register push notifications when token is available
+  useEffect(() => {
+    if (userToken) {
+      registerForPushNotificationsAsync(userToken);
+    }
+  }, [userToken]);
+
+  // Foreground notification listener
+  useEffect(() => {
+    if (!userToken) return;
+
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received in foreground:', notification);
+      loadNotifications();
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification clicked:', response);
+    });
+
+    return () => {
+      subscription.remove();
+      responseSubscription.remove();
+    };
   }, [userToken, loadNotifications]);
 
   const onRefresh = async () => {
