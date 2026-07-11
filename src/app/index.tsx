@@ -43,6 +43,16 @@ export default function HomeScreen() {
   const [slotStartTime, setSlotStartTime] = useState('');
   const [slotEndTime, setSlotEndTime] = useState('');
 
+  // Klinik Analitiği State'leri
+  const [isClinicAnalyticsModalVisible, setIsClinicAnalyticsModalVisible] = useState(false);
+  const [cohortsData, setCohortsData] = useState<any[]>([]);
+  const [complianceData, setComplianceData] = useState<any[]>([]);
+  const [weightLossRates, setWeightLossRates] = useState<any[]>([]);
+
+  // Danışan Analitik State'leri
+  const [predictionData, setPredictionData] = useState<any>(null);
+  const [correlationData, setCorrelationData] = useState<any>(null);
+
   // Admin Diyetisyen Başvuru State'leri
   const [applications, setApplications] = useState<any[]>([]);
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
@@ -518,11 +528,31 @@ export default function HomeScreen() {
           setCycleDay(todayLog.cycleDay ? todayLog.cycleDay.toString() : '');
           setInsulinCraving(todayLog.insulinCravingLevel || 0);
         }
+
+        // Danışan analiz ve tahmin verilerini çek
+        if (userInfo?.id) {
+          try {
+            const [resPred, resCorr] = await Promise.all([
+              axios.get(`${API_BASE_URL}/api/v1/analytics/client/${userInfo.id}/prediction`, {
+                headers: { Authorization: `Bearer ${userToken}` }
+              }),
+              axios.get(`${API_BASE_URL}/api/v1/analytics/client/${userInfo.id}/correlation`, {
+                headers: { Authorization: `Bearer ${userToken}` }
+              })
+            ]);
+            setPredictionData(resPred.data);
+            setCorrelationData(resCorr.data);
+          } catch (analErr) {
+            console.log("Analytics data not loaded or insufficient:", analErr);
+            setPredictionData(null);
+            setCorrelationData(null);
+          }
+        }
       }
     } catch (e: any) {
       console.error("Data load error in dashboard:", e.message);
     }
-  }, [userToken, isDietitian, syncOfflineLogs]);
+  }, [userToken, isDietitian, syncOfflineLogs, userInfo]);
 
   useEffect(() => {
     loadData();
@@ -630,6 +660,44 @@ export default function HomeScreen() {
     } catch (e: any) {
       Alert.alert("Hata", "Diyet durumu güncellenemedi.");
     }
+  };
+
+  // Klinik Analitik Verilerini Çekme (Diyetisyen)
+  const fetchClinicAnalytics = useCallback(async () => {
+    if (!userToken) return;
+    try {
+      const [resCohorts, resCompliance, resRates] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/v1/analytics/dietitian/cohorts`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/v1/analytics/dietitian/compliance`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/v1/analytics/dietitian/rates`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        })
+      ]);
+      setCohortsData(resCohorts.data);
+      setComplianceData(resCompliance.data);
+      setWeightLossRates(resRates.data);
+    } catch (e) {
+      console.error("Failed to load clinic analytics:", e);
+    }
+  }, [userToken]);
+
+  useEffect(() => {
+    if (isClinicAnalyticsModalVisible && isDietitian) {
+      fetchClinicAnalytics();
+    }
+  }, [isClinicAnalyticsModalVisible, isDietitian, fetchClinicAnalytics]);
+
+  const getCorrelationMeaning = (r: number | null | undefined) => {
+    if (r === null || r === undefined) return { text: 'Yetersiz veri', color: theme.textSecondary, bg: theme.backgroundSelected };
+    if (r >= 0.5) return { text: 'Güçlü Pozitif İlişki (Çok Etkili)', color: '#2E7D32', bg: '#E8F5E9' };
+    if (r >= 0.1) return { text: 'Orta/Zayıf Pozitif İlişki (Etkili)', color: '#F57C00', bg: '#FFF3E0' };
+    if (r <= -0.5) return { text: 'Güçlü Negatif İlişki', color: '#C62828', bg: '#FFEBEE' };
+    if (r <= -0.1) return { text: 'Zayıf Negatif İlişki', color: '#D32F2F', bg: '#FFEBEE' };
+    return { text: 'Nötr / İlişki Yok', color: theme.textSecondary, bg: theme.backgroundSelected };
   };
 
   // Randevu slotlarını çekme
@@ -1049,6 +1117,13 @@ export default function HomeScreen() {
               onPress={() => setIsSlotModalVisible(true)}
             >
               <ThemedText style={styles.primaryActionBtnText}>➕ Çalışma Saati Slotu Ekle</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.primaryActionBtn, { backgroundColor: '#43A047', marginTop: 10 }]}
+              onPress={() => setIsClinicAnalyticsModalVisible(true)}
+            >
+              <ThemedText style={styles.primaryActionBtnText}>📊 Klinik Analitiği Detayları</ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -1685,6 +1760,85 @@ export default function HomeScreen() {
               </View>
             )}
 
+            {/* AI Hedef Kilo Tahmini & Alışkanlık Analizi */}
+            {predictionData && (
+              <View style={{ marginTop: 15 }}>
+                <ThemedText style={styles.sectionTitle}>🔮 AI Hedef Kilo Tahmini</ThemedText>
+                <View style={{ backgroundColor: theme.backgroundElement, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.backgroundSelected, gap: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: theme.textSecondary }}>Hedef Kilo:</Text>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.text }}>{predictionData.targetWeight} kg</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: theme.textSecondary }}>Tahmini Hedef Tarihi:</Text>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#2E7D32' }}>{predictionData.predictedTargetDate || 'Hesaplanamıyor'}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: theme.textSecondary }}>Kalan Tahmini Gün:</Text>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.primary }}>
+                      {predictionData.daysRemaining !== null && predictionData.daysRemaining !== undefined && predictionData.daysRemaining >= 0 
+                        ? `${predictionData.daysRemaining} gün` 
+                        : 'Yetersiz veri'}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: theme.textSecondary }}>Model Güven Skoru (R²):</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>%{((predictionData.r2 || 0) * 100).toFixed(0)}</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, fontStyle: 'italic', marginTop: 4, lineHeight: 15 }}>
+                    {predictionData.message || 'Tahminleme geçmiş kilo kayıp trendinize göre doğrusal regresyon (OLS) modeliyle yapılmıştır.'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {correlationData && (
+              <View style={{ marginTop: 15 }}>
+                <ThemedText style={styles.sectionTitle}>🎯 Alışkanlık & Kilo İlişki Analizi</ThemedText>
+                <View style={{ backgroundColor: theme.backgroundElement, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.backgroundSelected, gap: 10 }}>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 4, lineHeight: 16 }}>
+                    Günlük alışkanlıklarınızın kilo kaybınız üzerindeki etkisi (Pearson r Korelasyonu):
+                  </Text>
+                  
+                  {/* Uyum Korelasyonu */}
+                  {correlationData.dietComplianceCorrelation !== null && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>🥗 Diyet Programı Uyumu</Text>
+                      <View style={{ backgroundColor: getCorrelationMeaning(correlationData.dietComplianceCorrelation).bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: getCorrelationMeaning(correlationData.dietComplianceCorrelation).color }}>
+                          r = {correlationData.dietComplianceCorrelation.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Su Korelasyonu */}
+                  {correlationData.waterIntakeCorrelation !== null && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>💧 Su Tüketimi</Text>
+                      <View style={{ backgroundColor: getCorrelationMeaning(correlationData.waterIntakeCorrelation).bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: getCorrelationMeaning(correlationData.waterIntakeCorrelation).color }}>
+                          r = {correlationData.waterIntakeCorrelation.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Aktivite Korelasyonu */}
+                  {correlationData.physicalActivityCorrelation !== null && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>🏃 Fiziksel Aktivite</Text>
+                      <View style={{ backgroundColor: getCorrelationMeaning(correlationData.physicalActivityCorrelation).bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: getCorrelationMeaning(correlationData.physicalActivityCorrelation).color }}>
+                          r = {correlationData.physicalActivityCorrelation.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* Diyetisyen Künyesi */}
             {userInfo?.dietitian ? (
               <View style={[styles.dietitianCreditsCard, { backgroundColor: theme.backgroundElement }]}>
@@ -2111,6 +2265,113 @@ export default function HomeScreen() {
                 <ThemedText style={styles.saveBtnText}>Slotu Kaydet ve Aç</ThemedText>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================
+         KLİNİK ANALİTİĞİ VE VERİ RAPORLARI MODALI (DIETITIAN ONLY)
+         ======================================================== */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isClinicAnalyticsModalVisible}
+        onRequestClose={() => setIsClinicAnalyticsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background, maxHeight: '90%', height: '90%' }]}>
+            
+            <View style={styles.modalHeader}>
+              <ThemedText type="subtitle">📊 Klinik Analitiği Raporları</ThemedText>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsClinicAnalyticsModalVisible(false)}>
+                <ThemedText style={styles.modalCloseBtnText}>Kapat</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ padding: 16 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: 50 }}>
+              
+              {/* 1. Kohort Analizi Kartı */}
+              <View style={{ backgroundColor: theme.backgroundElement, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.backgroundSelected }}>
+                <ThemedText style={{ fontSize: 16, fontWeight: 'bold', color: theme.primary, marginBottom: 12 }}>👥 Kohort Analizi (Aylık Kilo Kaybı)</ThemedText>
+                {cohortsData.length > 0 ? (
+                  <View style={{ gap: 8 }}>
+                    {/* Header */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#EEEEEE', paddingBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.textSecondary, flex: 1 }}>Kohort Ayı</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.textSecondary, width: 65, textAlign: 'right' }}>Başl. Kilo</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.textSecondary, width: 65, textAlign: 'right' }}>Güncel Kilo</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.textSecondary, width: 65, textAlign: 'right' }}>Ort. Kayıp</Text>
+                    </View>
+                    {/* Rows */}
+                    {cohortsData.map((c, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text, flex: 1 }}>{c.cohortMonth}</Text>
+                        <Text style={{ fontSize: 12, color: theme.text, width: 65, textAlign: 'right' }}>{c.averageInitialWeight.toFixed(1)} kg</Text>
+                        <Text style={{ fontSize: 12, color: theme.text, width: 65, textAlign: 'right' }}>{c.averageCurrentWeight.toFixed(1)} kg</Text>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#2E7D32', width: 65, textAlign: 'right' }}>-{c.averageWeightLoss.toFixed(1)} kg</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, fontStyle: 'italic' }}>Analiz için yeterli kohort verisi yok.</Text>
+                )}
+              </View>
+
+              {/* 2. Kategori Bazlı Uyum Oranları Kartı */}
+              <View style={{ backgroundColor: theme.backgroundElement, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.backgroundSelected }}>
+                <ThemedText style={{ fontSize: 16, fontWeight: 'bold', color: theme.primary, marginBottom: 12 }}>🎯 Kategori Bazlı Uyum Oranları</ThemedText>
+                {complianceData.length > 0 ? (
+                  <View style={{ gap: 12 }}>
+                    {complianceData.map((item, idx) => {
+                      const complianceVal = item.averageCompliancePercentage || 0;
+                      const barColor = complianceVal >= 80 ? '#2E7D32' : complianceVal >= 50 ? '#F9A825' : '#C62828';
+                      return (
+                        <View key={idx}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>
+                              {translateCategory(item.category)} ({item.clientCount} Danışan)
+                            </Text>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: barColor }}>
+                              %{complianceVal.toFixed(0)} Uyum
+                            </Text>
+                          </View>
+                          <View style={{ height: 8, width: '100%', backgroundColor: theme.backgroundSelected, borderRadius: 4, overflow: 'hidden' }}>
+                            <View style={{ height: '100%', width: `${Math.min(100, Math.max(0, complianceVal))}%`, backgroundColor: barColor, borderRadius: 4 }} />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, fontStyle: 'italic' }}>Uyum verileri yüklenemedi.</Text>
+                )}
+              </View>
+
+              {/* 3. Haftalık Kilo Kaybı Hızları Kartı */}
+              <View style={{ backgroundColor: theme.backgroundElement, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.backgroundSelected }}>
+                <ThemedText style={{ fontSize: 16, fontWeight: 'bold', color: theme.primary, marginBottom: 12 }}>⚡ Haftalık Kilo Verme Hızları</ThemedText>
+                {weightLossRates.length > 0 ? (
+                  <View style={{ gap: 10 }}>
+                    {weightLossRates.map((rate, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: idx < weightLossRates.length - 1 ? 0.5 : 0, borderBottomColor: theme.backgroundSelected }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.text }}>{rate.clientName}</Text>
+                          <Text style={{ fontSize: 11, color: theme.textSecondary }}>Kategori: {translateCategory(rate.category)}</Text>
+                        </View>
+                        <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#2E7D32' }}>
+                            {rate.weeklyLossRate.toFixed(2)} kg/hafta
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, fontStyle: 'italic' }}>Kilo verme hızı ölçümü yok.</Text>
+                )}
+              </View>
+
+            </ScrollView>
           </View>
         </View>
       </Modal>

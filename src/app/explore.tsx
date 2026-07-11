@@ -28,6 +28,10 @@ export default function ExploreScreen() {
   const [clientDailyLogs, setClientDailyLogs] = useState<any[]>([]);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
 
+  // Danışan Analiz & Tahmin State'leri (Diyetisyen Görünümü)
+  const [clientPrediction, setClientPrediction] = useState<any>(null);
+  const [clientCorrelation, setClientCorrelation] = useState<any>(null);
+
   // Ölçüm Ekleme Modalı State'leri
   const [isMeasurementModalVisible, setIsMeasurementModalVisible] = useState(false);
   const [mWeight, setMWeight] = useState('');
@@ -325,6 +329,24 @@ export default function ExploreScreen() {
       });
       setClientDailyLogs(resLogs.data);
 
+      // Tahmin ve Korelasyon Verilerini Çek (Diyetisyen)
+      try {
+        const [resPred, resCorr] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/v1/analytics/client/${client.id}/prediction`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          }),
+          axios.get(`${API_BASE_URL}/api/v1/analytics/client/${client.id}/correlation`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          })
+        ]);
+        setClientPrediction(resPred.data);
+        setClientCorrelation(resCorr.data);
+      } catch (analErr) {
+        console.log("Failed to load client analytics details:", analErr);
+        setClientPrediction(null);
+        setClientCorrelation(null);
+      }
+
       setIsDetailModalVisible(true);
     } catch (e) {
       Alert.alert("Hata", "Danışan verileri yüklenemedi.");
@@ -436,6 +458,15 @@ export default function ExploreScreen() {
       case 'HORMONAL_BALANCE': return 'Hormon';
       default: return 'Kilo';
     }
+  };
+
+  const getCorrelationMeaning = (r: number | null | undefined) => {
+    if (r === null || r === undefined) return { text: 'Yetersiz veri', color: theme.textSecondary, bg: theme.backgroundSelected };
+    if (r >= 0.5) return { text: 'Güçlü Pozitif İlişki (Çok Etkili)', color: '#2E7D32', bg: '#E8F5E9' };
+    if (r >= 0.1) return { text: 'Orta/Zayıf Pozitif İlişki (Etkili)', color: '#F57C00', bg: '#FFF3E0' };
+    if (r <= -0.5) return { text: 'Güçlü Negatif İlişki', color: '#C62828', bg: '#FFEBEE' };
+    if (r <= -0.1) return { text: 'Zayıf Negatif İlişki', color: '#D32F2F', bg: '#FFEBEE' };
+    return { text: 'Nötr / İlişki Yok', color: theme.textSecondary, bg: theme.backgroundSelected };
   };
 
   return (
@@ -823,6 +854,77 @@ export default function ExploreScreen() {
                     <ThemedText style={styles.actionBtnText}>🥗 Diyet Ata</ThemedText>
                   </TouchableOpacity>
                 </View>
+
+                {/* AI Tahmin & Alışkanlık Analiz Raporu */}
+                {(clientPrediction || clientCorrelation) && (
+                  <View style={{ marginVertical: 12, backgroundColor: theme.backgroundElement, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.backgroundSelected, gap: 12 }}>
+                    <ThemedText style={{ fontSize: 14, fontWeight: 'bold', color: theme.primary }}>🔮 AI Kilo Tahmini & Alışkanlık Raporu</ThemedText>
+                    
+                    {clientPrediction ? (
+                      <View style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: theme.textSecondary }}>Hedef:</Text>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.text }}>{clientPrediction.targetWeight} kg</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: theme.textSecondary }}>Tahmini Tarih:</Text>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#2E7D32' }}>{clientPrediction.predictedTargetDate || 'Yetersiz veri'}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: theme.textSecondary }}>Kalan Tahmini Gün:</Text>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.primary }}>
+                            {clientPrediction.daysRemaining !== null && clientPrediction.daysRemaining !== undefined && clientPrediction.daysRemaining >= 0 
+                              ? `${clientPrediction.daysRemaining} gün` 
+                              : 'Yetersiz veri'}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: theme.textSecondary }}>Model Güven Skoru (R²):</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>%{((clientPrediction.r2 || 0) * 100).toFixed(0)}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {clientCorrelation ? (
+                      <View style={{ borderTopWidth: 0.5, borderTopColor: theme.backgroundSelected, paddingTop: 10, gap: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.textSecondary, marginBottom: 2 }}>Alışkanlık Korelasyon Analizi (r):</Text>
+                        
+                        {clientCorrelation.dietComplianceCorrelation !== null && (
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: theme.text }}>🥗 Diyet Programı Uyumu:</Text>
+                            <View style={{ backgroundColor: getCorrelationMeaning(clientCorrelation.dietComplianceCorrelation).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: 'bold', color: getCorrelationMeaning(clientCorrelation.dietComplianceCorrelation).color }}>
+                                r = {clientCorrelation.dietComplianceCorrelation.toFixed(2)}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {clientCorrelation.waterIntakeCorrelation !== null && (
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: theme.text }}>💧 Su Tüketimi:</Text>
+                            <View style={{ backgroundColor: getCorrelationMeaning(clientCorrelation.waterIntakeCorrelation).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: 'bold', color: getCorrelationMeaning(clientCorrelation.waterIntakeCorrelation).color }}>
+                                r = {clientCorrelation.waterIntakeCorrelation.toFixed(2)}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {clientCorrelation.physicalActivityCorrelation !== null && (
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: theme.text }}>🏃 Fiziksel Aktivite:</Text>
+                            <View style={{ backgroundColor: getCorrelationMeaning(clientCorrelation.physicalActivityCorrelation).bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: 'bold', color: getCorrelationMeaning(clientCorrelation.physicalActivityCorrelation).color }}>
+                                r = {clientCorrelation.physicalActivityCorrelation.toFixed(2)}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    ) : null}
+                  </View>
+                )}
 
                 {/* Klinik Günlük Rapor Paneli (Faz 1) */}
                 <ThemedText style={styles.modalSectionTitle}>📋 Klinik Günlük Takip Raporu (Son 14 Gün)</ThemedText>
