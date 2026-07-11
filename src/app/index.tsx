@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, View, TextInput, Alert, Modal, Text, Linking, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -99,6 +99,8 @@ export default function HomeScreen() {
   const [broadcastText, setBroadcastText] = useState('');
   const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
+  const wsRef = useRef<WebSocket | null>(null);
+
   const fetchChatHistory = useCallback(async () => {
     if (!userToken || !chatWithUser) return;
     try {
@@ -112,27 +114,90 @@ export default function HomeScreen() {
   }, [userToken, chatWithUser]);
 
   useEffect(() => {
-    if (!isChatModalVisible || !chatWithUser) return;
+    if (!isChatModalVisible || !chatWithUser || !userToken) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      return;
+    }
+
+    // Fetch initial chat history
     fetchChatHistory();
-    const interval = setInterval(fetchChatHistory, 4000); // Poll every 4 seconds
-    return () => clearInterval(interval);
-  }, [isChatModalVisible, chatWithUser, fetchChatHistory]);
+
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/ws/chat?token=' + encodeURIComponent(userToken);
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'message') {
+          const msg = data.data;
+          
+          // Check if message is relevant to active chat
+          const isFromChatWithUser = msg.sender.id === chatWithUser.id;
+          const isToChatWithUser = msg.recipient && msg.recipient.id === chatWithUser.id;
+          const isRelevantBroadcast = msg.broadcast && userInfo?.role === 'ROLE_USER' && msg.sender.id === userInfo?.dietitian?.id;
+
+          if (isFromChatWithUser || isToChatWithUser || isRelevantBroadcast) {
+            setChatMessages((prev) => {
+              if (prev.some((m) => m.id === msg.id)) return prev;
+              return [...prev, msg];
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse WebSocket message:", err);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket disconnected");
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [isChatModalVisible, chatWithUser, userToken, fetchChatHistory, userInfo]);
 
   const handleSendChatMessage = async () => {
     if (!typedMessage.trim() || !chatWithUser) return;
-    setIsSendingMessage(true);
-    try {
-      await axios.post(`${API_BASE_URL}/api/v1/messages/send/${chatWithUser.id}`, {
-        content: typedMessage.trim()
-      }, {
-        headers: { Authorization: `Bearer ${userToken}` }
-      });
-      setTypedMessage('');
-      fetchChatHistory();
-    } catch (err: any) {
-      Alert.alert("Hata", err.response?.data || "Mesaj gönderilemedi.");
-    } finally {
-      setIsSendingMessage(false);
+    
+    const messageContent = typedMessage.trim();
+    setTypedMessage('');
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        recipientId: chatWithUser.id,
+        content: messageContent,
+        isBroadcast: false
+      }));
+    } else {
+      setIsSendingMessage(true);
+      try {
+        await axios.post(`${API_BASE_URL}/api/v1/messages/send/${chatWithUser.id}`, {
+          content: messageContent
+        }, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        fetchChatHistory();
+      } catch (err: any) {
+        Alert.alert("Hata", err.response?.data || "Mesaj gönderilemedi.");
+      } finally {
+        setIsSendingMessage(false);
+      }
     }
   };
 
