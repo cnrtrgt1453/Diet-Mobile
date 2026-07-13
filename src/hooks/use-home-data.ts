@@ -134,7 +134,7 @@ export function useHomeData() {
     if (!isDietitian) {
       // Sync logs from offline storage first
       try {
-        const queueStr = await SecureStore.getItemAsync('@offline_logs_queue');
+        const queueStr = await SecureStore.getItemAsync('offline_logs_queue');
         if (queueStr) {
           const queue = JSON.parse(queueStr);
           if (queue.length > 0) {
@@ -152,7 +152,7 @@ export function useHomeData() {
                 }
               }
             }
-            await SecureStore.setItemAsync('@offline_logs_queue', JSON.stringify(remainingQueue));
+            await SecureStore.setItemAsync('offline_logs_queue', JSON.stringify(remainingQueue));
             if (successCount > 0) {
               showAlert('Eşitleme Başarılı', `${successCount} adet çevrimdışı günlük kaydınız başarıyla senkronize edildi! 🔄`, 'success');
             }
@@ -185,7 +185,7 @@ export function useHomeData() {
         }
 
         // Pre-fill today's log fields if exists in cache
-        const cachedLog = await SecureStore.getItemAsync('@cached_today_log');
+        const cachedLog = await SecureStore.getItemAsync('cached_today_log');
         if (cachedLog) {
           const todayLog = JSON.parse(cachedLog);
           setWaterIntake(todayLog.waterIntakeMl || 0);
@@ -685,12 +685,12 @@ export function useHomeData() {
       await axios.post(`${API_BASE_URL}/api/v1/logs/daily`, payload, {
         headers: { Authorization: `Bearer ${userToken}` }
       });
-      await SecureStore.setItemAsync('@cached_today_log', JSON.stringify(payload));
+      await SecureStore.setItemAsync('cached_today_log', JSON.stringify(payload));
       showAlert("Başarılı", "Günlük durum kaydınız kaydedildi! 🌟", "success");
     } catch (err: any) {
       if (!err.response || err.message === 'Network Error') {
         try {
-          const queueStr = await SecureStore.getItemAsync('@offline_logs_queue');
+          const queueStr = await SecureStore.getItemAsync('offline_logs_queue');
           let queue = queueStr ? JSON.parse(queueStr) : [];
           const existingIndex = queue.findIndex((item: any) => item.logDate === payload.logDate);
           if (existingIndex > -1) {
@@ -698,8 +698,8 @@ export function useHomeData() {
           } else {
             queue.push(payload);
           }
-          await SecureStore.setItemAsync('@offline_logs_queue', JSON.stringify(queue));
-          await SecureStore.setItemAsync('@cached_today_log', JSON.stringify(payload));
+          await SecureStore.setItemAsync('offline_logs_queue', JSON.stringify(queue));
+          await SecureStore.setItemAsync('cached_today_log', JSON.stringify(payload));
           showAlert("Çevrimdışı Kayıt", "İnternet bağlantısı bulunamadı. Günlük durum kaydınız cihazınıza kaydedildi ve internet bağlantısı kurulduğunda eşitlenecektir.", "success");
         } catch (storageErr) {
           console.error('Failed to save log offline:', storageErr);

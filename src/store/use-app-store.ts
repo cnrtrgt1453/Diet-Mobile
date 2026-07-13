@@ -59,9 +59,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         headers: { Authorization: `Bearer ${token}` }
       });
       set({ stats: res.data });
-      await SecureStore.setItemAsync('@cached_stats', JSON.stringify(res.data));
+      await SecureStore.setItemAsync('cached_stats', JSON.stringify(res.data));
     } catch (e) {
-      const cached = await SecureStore.getItemAsync('@cached_stats');
+      const cached = await SecureStore.getItemAsync('cached_stats');
       if (cached) set({ stats: JSON.parse(cached) });
     }
   },
@@ -77,11 +77,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       ]);
       set({ notifications: resNotifs.data, unreadCount: resCount.data });
-      await SecureStore.setItemAsync('@cached_notifications', JSON.stringify(resNotifs.data));
-      await SecureStore.setItemAsync('@cached_unread_count', String(resCount.data));
+      await SecureStore.setItemAsync('cached_notifications', JSON.stringify(resNotifs.data));
+      await SecureStore.setItemAsync('cached_unread_count', String(resCount.data));
     } catch (e) {
-      const cachedNotifs = await SecureStore.getItemAsync('@cached_notifications');
-      const cachedCount = await SecureStore.getItemAsync('@cached_unread_count');
+      const cachedNotifs = await SecureStore.getItemAsync('cached_notifications');
+      const cachedCount = await SecureStore.getItemAsync('cached_unread_count');
       set({
         notifications: cachedNotifs ? JSON.parse(cachedNotifs) : [],
         unreadCount: cachedCount ? Number(cachedCount) : 0
@@ -101,25 +101,25 @@ export const useAppStore = create<AppState>((set, get) => ({
           })
         ]);
         set({ pendingAppointments: resPending.data, approvedAppointments: resApproved.data });
-        await SecureStore.setItemAsync('@cached_pending_apps', JSON.stringify(resPending.data));
-        await SecureStore.setItemAsync('@cached_approved_apps', JSON.stringify(resApproved.data));
+        await SecureStore.setItemAsync('cached_pending_apps', JSON.stringify(resPending.data));
+        await SecureStore.setItemAsync('cached_approved_apps', JSON.stringify(resApproved.data));
       } else {
         const resApps = await axios.get(`${API_BASE_URL}/api/v1/appointments/my`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         set({ myAppointments: resApps.data });
-        await SecureStore.setItemAsync('@cached_my_appointments', JSON.stringify(resApps.data));
+        await SecureStore.setItemAsync('cached_my_appointments', JSON.stringify(resApps.data));
       }
     } catch (e) {
       if (isDietitian) {
-        const cachedPending = await SecureStore.getItemAsync('@cached_pending_apps');
-        const cachedApproved = await SecureStore.getItemAsync('@cached_approved_apps');
+        const cachedPending = await SecureStore.getItemAsync('cached_pending_apps');
+        const cachedApproved = await SecureStore.getItemAsync('cached_approved_apps');
         set({
           pendingAppointments: cachedPending ? JSON.parse(cachedPending) : [],
           approvedAppointments: cachedApproved ? JSON.parse(cachedApproved) : []
         });
       } else {
-        const cachedApps = await SecureStore.getItemAsync('@cached_my_appointments');
+        const cachedApps = await SecureStore.getItemAsync('cached_my_appointments');
         if (cachedApps) set({ myAppointments: JSON.parse(cachedApps) });
       }
     }
@@ -131,9 +131,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         headers: { Authorization: `Bearer ${token}` }
       });
       set({ applications: res.data });
-      await SecureStore.setItemAsync('@cached_applications', JSON.stringify(res.data));
+      await SecureStore.setItemAsync('cached_applications', JSON.stringify(res.data));
     } catch (e) {
-      const cached = await SecureStore.getItemAsync('@cached_applications');
+      const cached = await SecureStore.getItemAsync('cached_applications');
       if (cached) set({ applications: JSON.parse(cached) });
     }
   },
@@ -163,13 +163,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       if (typeof res.data === 'object' && res.data !== null) {
         set({ todayDiet: res.data });
-        await SecureStore.setItemAsync('@cached_today_diet', JSON.stringify(res.data));
+        await SecureStore.setItemAsync('cached_today_diet', JSON.stringify(res.data));
       } else {
         set({ todayDiet: null });
-        await SecureStore.deleteItemAsync('@cached_today_diet');
+        await SecureStore.deleteItemAsync('cached_today_diet');
       }
     } catch (e) {
-      const cached = await SecureStore.getItemAsync('@cached_today_diet');
+      const cached = await SecureStore.getItemAsync('cached_today_diet');
       if (cached) set({ todayDiet: JSON.parse(cached) });
     }
   },
@@ -185,11 +185,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       ]);
       set({ predictionData: resPred.data, correlationData: resCorr.data });
-      await SecureStore.setItemAsync('@cached_prediction', JSON.stringify(resPred.data));
-      await SecureStore.setItemAsync('@cached_correlation', JSON.stringify(resCorr.data));
+      await SecureStore.setItemAsync('cached_prediction', JSON.stringify(resPred.data));
+      await SecureStore.setItemAsync('cached_correlation', JSON.stringify(resCorr.data));
     } catch (e) {
-      const cachedPred = await SecureStore.getItemAsync('@cached_prediction');
-      const cachedCorr = await SecureStore.getItemAsync('@cached_correlation');
+      const cachedPred = await SecureStore.getItemAsync('cached_prediction');
+      const cachedCorr = await SecureStore.getItemAsync('cached_correlation');
       set({
         predictionData: cachedPred ? JSON.parse(cachedPred) : null,
         correlationData: cachedCorr ? JSON.parse(cachedCorr) : null
@@ -215,13 +215,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         complianceData: resComp.data,
         weightLossRates: resWeight.data
       });
-      await SecureStore.setItemAsync('@cached_cohorts', JSON.stringify(resCohorts.data));
-      await SecureStore.setItemAsync('@cached_compliance', JSON.stringify(resComp.data));
-      await SecureStore.setItemAsync('@cached_weight_loss', JSON.stringify(resWeight.data));
+      await SecureStore.setItemAsync('cached_cohorts', JSON.stringify(resCohorts.data));
+      await SecureStore.setItemAsync('cached_compliance', JSON.stringify(resComp.data));
+      await SecureStore.setItemAsync('cached_weight_loss', JSON.stringify(resWeight.data));
     } catch (e) {
-      const cachedCohorts = await SecureStore.getItemAsync('@cached_cohorts');
-      const cachedComp = await SecureStore.getItemAsync('@cached_compliance');
-      const cachedWeight = await SecureStore.getItemAsync('@cached_weight_loss');
+      const cachedCohorts = await SecureStore.getItemAsync('cached_cohorts');
+      const cachedComp = await SecureStore.getItemAsync('cached_compliance');
+      const cachedWeight = await SecureStore.getItemAsync('cached_weight_loss');
       set({
         cohortsData: cachedCohorts ? JSON.parse(cachedCohorts) : [],
         complianceData: cachedComp ? JSON.parse(cachedComp) : [],
@@ -241,11 +241,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       ]);
       set({ dietitians: resDietitians.data, connectionRequests: resMyReqs.data });
-      await SecureStore.setItemAsync('@cached_dietitians', JSON.stringify(resDietitians.data));
-      await SecureStore.setItemAsync('@cached_connection_reqs', JSON.stringify(resMyReqs.data));
+      await SecureStore.setItemAsync('cached_dietitians', JSON.stringify(resDietitians.data));
+      await SecureStore.setItemAsync('cached_connection_reqs', JSON.stringify(resMyReqs.data));
     } catch (e) {
-      const cachedDietitians = await SecureStore.getItemAsync('@cached_dietitians');
-      const cachedReqs = await SecureStore.getItemAsync('@cached_connection_reqs');
+      const cachedDietitians = await SecureStore.getItemAsync('cached_dietitians');
+      const cachedReqs = await SecureStore.getItemAsync('cached_connection_reqs');
       set({
         dietitians: cachedDietitians ? JSON.parse(cachedDietitians) : [],
         connectionRequests: cachedReqs ? JSON.parse(cachedReqs) : []
