@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, Platform, Modal, TextInput, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, TextInput, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as Facebook from 'expo-auth-session/providers/facebook';
@@ -16,7 +17,7 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { login, loginWithPassword, isLoading, showAlert } = useAuth();
   const theme = useTheme();
-  const [isMockMode, setIsMockMode] = useState(true); // Geliştirme kolaylığı için varsayılan true
+  const [isMockMode, setIsMockMode] = useState(false); // Geliştirme kolaylığı için varsayılan true, gerçek test için false
 
   // Rol Seçim Aşaması
   const [roleSelection, setRoleSelection] = useState<'NONE' | 'DIETITIAN' | 'CLIENT'>('NONE');
@@ -115,9 +116,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
   // Google OAuth Talebi Yapılandırması (Kendi ID'lerinizi buraya ekleyebilirsiniz)
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com',
-    iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
-    webClientId: '1084592554421-uou6riks1a4ej720oec3k1t6ejoc2q3j.apps.googleusercontent.com',
+    androidClientId: '1084592554421-vkihouq5nnuu1i2q17bou6o5bvkgu5mh.apps.googleusercontent.com',
+    iosClientId: '1084592554421-a46p0cssug1l1gcg08lcuc17jor6o00h.apps.googleusercontent.com',
+    webClientId: '1084592554421-f3t4ok658ibvg4hprrdv035o059obokm.apps.googleusercontent.com',
   });
 
   // Facebook OAuth Talebi Yapılandırması (Kendi App ID'nizi buraya ekleyebilirsiniz)

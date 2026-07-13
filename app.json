@@ -8,7 +8,8 @@
     "scheme": "dietmobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.diet.mobile"
     },
     "android": {
       "package": "com.diet.mobile",
