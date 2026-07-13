@@ -4,8 +4,9 @@ import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import { CustomAlert } from '../components/custom-alert';
 
-// Android emulator local bilgisayardaki backend'e erişmek için 10.0.2.2 kullanır. iOS için localhost.
-export const API_BASE_URL = 'http://192.168.1.5:8080';
+// Android emulator için 10.0.2.2 (lokalhost yönlendirmesi), fiziksel cihaz için 192.168.1.5 kullanın.
+export const API_BASE_URL = 'http://10.0.2.2:8080'; // Emülatör için
+// export const API_BASE_URL = 'http://192.168.1.5:8080'; // Fiziksel telefon için
 
 interface AuthContextType {
   isLoading: boolean;
